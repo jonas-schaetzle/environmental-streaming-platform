@@ -1,0 +1,5 @@
+[project]
+name = "environmental-streaming-platform"
+version = "0.1.0"
+description = "A step-by-step environmental streaming data platform for learning Spark, Kafka, and cloud data engineering."
+requires-python = ">=3.11"
