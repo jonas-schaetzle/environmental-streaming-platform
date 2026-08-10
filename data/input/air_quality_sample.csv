@@ -1,0 +1,6 @@
+station_id,city,measurement_type,value,unit,measured_at
+berlin-001,Berlin,pm25,14.2,ug/m3,2026-08-10T08:00:00Z
+berlin-001,Berlin,pm25,18.7,ug/m3,2026-08-10T09:00:00Z
+berlin-002,Berlin,no2,31.5,ug/m3,2026-08-10T08:00:00Z
+hamburg-001,Hamburg,pm25,9.8,ug/m3,2026-08-10T08:00:00Z
+hamburg-001,Hamburg,no2,22.1,ug/m3,2026-08-10T09:00:00Z
