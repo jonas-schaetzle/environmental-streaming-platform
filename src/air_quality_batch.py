@@ -5,6 +5,7 @@ from pyspark.sql.types import DoubleType, StringType, StructField, StructType, T
 
 INPUT_PATH = "data/input/air_quality_sample.csv"
 OUTPUT_PATH = "data/output/air_quality_by_city_measurement"
+LOCAL_SHUFFLE_PARTITIONS = "4"
 
 
 schema = StructType(
@@ -24,6 +25,7 @@ def main() -> None:
         SparkSession.builder
         .appName("air-quality-batch")
         .master("local[*]")
+        .config("spark.sql.shuffle.partitions", LOCAL_SHUFFLE_PARTITIONS)
         .getOrCreate()
     )
 
