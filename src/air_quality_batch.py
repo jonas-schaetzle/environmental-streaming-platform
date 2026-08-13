@@ -39,6 +39,10 @@ def read_air_quality_readings(spark: SparkSession) -> DataFrame:
     )
 
 
+def filter_valid_readings(readings: DataFrame) -> DataFrame:
+    return readings.filter(col("value").isNotNull() & (col("value") >= 0))
+
+
 def aggregate_air_quality(readings: DataFrame) -> DataFrame:
     return (
         readings
@@ -71,7 +75,8 @@ def main() -> None:
     readings.printSchema()
     readings.show(truncate=False)
 
-    aggregates = aggregate_air_quality(readings)
+    valid_readings = filter_valid_readings(readings)
+    aggregates = aggregate_air_quality(valid_readings)
 
     aggregates.show(truncate=False)
     write_aggregates(aggregates)

@@ -3,7 +3,7 @@ from collections.abc import Generator
 import pytest
 from pyspark.sql import SparkSession
 
-from src.air_quality_batch import aggregate_air_quality
+from src.air_quality_batch import aggregate_air_quality, filter_valid_readings
 
 
 @pytest.fixture(scope="session")
@@ -20,6 +20,27 @@ def spark() -> Generator[SparkSession]:
     yield session
 
     session.stop()
+
+
+def test_filter_valid_readings_removes_null_and_negative_values(
+    spark: SparkSession,
+) -> None:
+    readings = spark.createDataFrame(
+        [
+            ("Berlin", "pm25", 14.2, "ug/m3"),
+            ("Berlin", "pm25", -1.0, "ug/m3"),
+            ("Hamburg", "no2", None, "ug/m3"),
+        ],
+        ["city", "measurement_type", "value", "unit"],
+    )
+
+    result = filter_valid_readings(readings)
+
+    actual = result.collect()
+
+    assert len(actual) == 1
+    assert actual[0]["city"] == "Berlin"
+    assert actual[0]["value"] == 14.2
 
 
 def test_aggregate_air_quality_groups_by_city_measurement_and_unit(
