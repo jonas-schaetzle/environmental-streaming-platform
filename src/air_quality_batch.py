@@ -62,6 +62,7 @@ def write_aggregates(aggregates: DataFrame) -> None:
         aggregates
         .write
         .mode("overwrite")
+        .partitionBy("measurement_type")
         .parquet(OUTPUT_PATH)
     )
 
