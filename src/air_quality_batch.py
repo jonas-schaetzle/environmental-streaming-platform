@@ -1,4 +1,4 @@
-from pyspark.sql import SparkSession
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import avg, col, count, max as spark_max, min as spark_min
 from pyspark.sql.types import DoubleType, StringType, StructField, StructType, TimestampType
 
@@ -20,8 +20,8 @@ schema = StructType(
 )
 
 
-def main() -> None:
-    spark = (
+def create_spark_session() -> SparkSession:
+    return (
         SparkSession.builder
         .appName("air-quality-batch")
         .master("local[*]")
@@ -29,38 +29,52 @@ def main() -> None:
         .getOrCreate()
     )
 
-    spark.sparkContext.setLogLevel("WARN")
 
-    readings = (
+def read_air_quality_readings(spark: SparkSession) -> DataFrame:
+    return (
         spark.read
         .option("header", True)
         .schema(schema)
         .csv(INPUT_PATH)
     )
 
-    readings.printSchema()
-    readings.show(truncate=False)
 
-    aggregates = (
+def aggregate_air_quality(readings: DataFrame) -> DataFrame:
+    return (
         readings
         .groupBy("city", "measurement_type", "unit")
         .agg(
             count("*").alias("reading_count"),
             avg("value").alias("avg_value"),
             spark_min("value").alias("min_value"),
-            spark_max("value").alias("max_value"),
+            spark_max("value").alias("max_value")
         )
         .orderBy(col("city"), col("measurement_type"))
     )
 
-    aggregates.show(truncate=False)
 
+def write_aggregates(aggregates: DataFrame) -> None:
     (
         aggregates
         .write
         .mode("overwrite")
         .parquet(OUTPUT_PATH)
     )
+
+
+def main() -> None:
+    spark = create_spark_session()
+    spark.sparkContext.setLogLevel("WARN")
+
+    readings = read_air_quality_readings(spark)
+
+    readings.printSchema()
+    readings.show(truncate=False)
+
+    aggregates = aggregate_air_quality(readings)
+
+    aggregates.show(truncate=False)
+    write_aggregates(aggregates)
 
     spark.stop()
 
