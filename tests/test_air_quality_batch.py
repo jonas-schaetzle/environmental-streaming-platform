@@ -1,25 +1,6 @@
-from collections.abc import Generator
-
-import pytest
 from pyspark.sql import SparkSession
 
 from src.air_quality_batch import aggregate_air_quality, filter_valid_readings
-
-
-@pytest.fixture(scope="session")
-def spark() -> Generator[SparkSession]:
-    session = (
-        SparkSession.builder
-        .appName("air-quality-tests")
-        .master("local[*]")
-        .config("spark.sql.shuffle.partitions", "2")
-        .getOrCreate()
-    )
-    session.sparkContext.setLogLevel("WARN")
-
-    yield session
-
-    session.stop()
 
 
 def test_filter_valid_readings_removes_null_and_negative_values(
