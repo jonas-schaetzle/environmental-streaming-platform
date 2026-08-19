@@ -11,6 +11,7 @@ from pyspark.sql.types import (
 
 from src.openaq_latest_batch import (
     enrich_latest_measurements,
+    filter_complete_measurements,
     flatten_latest_measurements,
     flatten_sensor_metadata,
 )
@@ -207,4 +208,32 @@ def test_enrich_latest_measurements_adds_sensor_metadata(
     assert rows[0]["parameter"] == "so2"
     assert rows[0]["parameter_display_name"] == "SO2"
     assert rows[0]["value"] == 0.0004
+    assert rows[0]["unit"] == "ppm"
+
+
+def test_filter_complete_measurements_removes_missing_metadata(
+    spark: SparkSession,
+) -> None:
+    measurements = spark.createDataFrame(
+        [
+            (123, 456, "so2", "SO2", 0.0004, "ppm"),
+            (123, 999, None, None, 12.3, None),
+        ],
+        [
+            "location_id",
+            "sensor_id",
+            "parameter",
+            "parameter_display_name",
+            "value",
+            "unit",
+        ],
+    )
+
+    result = filter_complete_measurements(measurements)
+
+    rows = result.collect()
+
+    assert len(rows) == 1
+    assert rows[0]["sensor_id"] == 456
+    assert rows[0]["parameter"] == "so2"
     assert rows[0]["unit"] == "ppm"

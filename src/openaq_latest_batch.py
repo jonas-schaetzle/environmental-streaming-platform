@@ -93,6 +93,13 @@ def enrich_latest_measurements(
     )
 
 
+def filter_complete_measurements(measurements: DataFrame) -> DataFrame:
+    return measurements.filter(
+        col("parameter").isNotNull()
+        & col("unit").isNotNull()
+    )
+
+
 def main() -> None:
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
@@ -102,7 +109,9 @@ def main() -> None:
 
     latest_measurements = flatten_latest_measurements(latest_raw)
     sensor_metadata = flatten_sensor_metadata(sensor_metadata_raw)
-    measurements = enrich_latest_measurements(latest_measurements, sensor_metadata)
+    measurements = filter_complete_measurements(
+        enrich_latest_measurements(latest_measurements, sensor_metadata)
+    )
 
     measurements.printSchema()
     measurements.show(truncate=False)
