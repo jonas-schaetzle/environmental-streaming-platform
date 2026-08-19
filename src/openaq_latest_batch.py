@@ -4,7 +4,7 @@ from pyspark.sql.functions import col, explode, to_timestamp
 
 INPUT_PATH = "data/input/openaq_location_latest_raw.json"
 OUTPUT_PATH = "data/output/openaq_location_latest"
-SENSOR_METADATA_INPUT_PATH = "data/input/openaq_sensor_raw.json"
+SENSOR_METADATA_INPUT_PATH = "data/input/openaq_sensors"
 
 
 def create_spark_session() -> SparkSession:
