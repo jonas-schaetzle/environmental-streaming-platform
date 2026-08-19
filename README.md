@@ -19,3 +19,22 @@ This repository currently contains only the minimal structure needed to begin:
 ## Near-Term Direction
 
 The next implementation step is a small Spark batch job over local environmental sample data. That step will introduce Spark deliberately, with explicit schemas, DataFrame transformations, actions, and Parquet output.
+
+## Canonical Measurement Model
+
+The platform normalizes source-specific environmental measurements into a small canonical model before writing analytical outputs.
+
+Current fields:
+
+- `source`: source system name, for example `openaq`
+- `location_id`: source-specific location identifier
+- `sensor_id`: source-specific sensor identifier
+- `parameter`: measured quantity, for example `pm25`, `no2`, or `o3`
+- `parameter_display_name`: human-readable parameter name
+- `value`: measured numeric value
+- `unit`: measurement unit
+- `measured_at_utc`: event timestamp in UTC
+- `latitude`: measurement latitude
+- `longitude`: measurement longitude
+
+This model is intentionally small and will evolve as additional sources and streaming semantics are added.
