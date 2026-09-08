@@ -1,5 +1,5 @@
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import col, explode, to_timestamp
+from pyspark.sql.functions import col, explode, lit, to_timestamp
 
 
 INPUT_PATH = "data/input/openaq_location_latest_raw.json"
@@ -79,6 +79,7 @@ def enrich_latest_measurements(
         latest_measurements
         .join(sensor_metadata, on="sensor_id", how="left")
         .select(
+            lit("openaq").alias("source"),
             "location_id",
             "sensor_id",
             "parameter",
