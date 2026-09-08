@@ -86,7 +86,6 @@ def enrich_latest_measurements(
             "parameter_display_name",
             "value",
             "unit",
-            "measured_at_utc_raw",
             "measured_at_utc",
             "latitude",
             "longitude",

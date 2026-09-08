@@ -202,6 +202,18 @@ def test_enrich_latest_measurements_adds_sensor_metadata(
 
     rows = result.collect()
 
+    assert result.columns == [
+        "source",
+        "location_id",
+        "sensor_id",
+        "parameter",
+        "parameter_display_name",
+        "value",
+        "unit",
+        "measured_at_utc",
+        "latitude",
+        "longitude",
+    ]
     assert len(rows) == 1
     assert rows[0]["source"] == "openaq"
     assert rows[0]["location_id"] == 123
