@@ -5,6 +5,23 @@ import pytest
 from src import openaq_api_ingest
 
 
+def test_get_required_env_var_returns_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAQ_API_KEY", "test-api-key")
+
+    result = openaq_api_ingest.get_required_env_var("OPENAQ_API_KEY")
+
+    assert result == "test-api-key"
+
+
+def test_get_required_env_var_rejects_missing_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAQ_API_KEY", raising=False)
+
+    with pytest.raises(ValueError, match="OPENAQ_API_KEY"):
+        openaq_api_ingest.get_required_env_var("OPENAQ_API_KEY")
+
+
 class FakeResponse:
     def __init__(self, payload: dict[str, Any]) -> None:
         self.payload = payload
