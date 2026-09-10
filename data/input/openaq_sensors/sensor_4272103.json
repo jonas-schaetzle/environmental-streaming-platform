@@ -1,1 +1,67 @@
-{"meta":{"name":"openaq-api","website":"/","page":1,"limit":100,"found":1},"results":[{"id":4272103,"name":"nox ppm","parameter":{"id":19840,"name":"nox","units":"ppm","displayName":"NOx"},"datetimeFirst":{"utc":"2023-03-29T18:00:00Z","local":"2023-03-29T12:00:00-06:00"},"datetimeLast":{"utc":"2026-08-19T12:00:00Z","local":"2026-08-19T06:00:00-06:00"},"coverage":{"expectedCount":1,"expectedInterval":"01:00:00","observedCount":23631,"observedInterval":"23631:00:00","percentComplete":2363100.0,"percentCoverage":2363100.0,"datetimeFrom":{"utc":"2023-03-29T18:00:00Z","local":"2023-03-29T12:00:00-06:00"},"datetimeTo":{"utc":"2026-08-19T12:00:00Z","local":"2026-08-19T06:00:00-06:00"}},"latest":{"datetime":{"utc":"2026-08-19T12:00:00Z","local":"2026-08-19T06:00:00-06:00"},"value":0.004,"coordinates":{"latitude":35.1353,"longitude":-106.584702}},"summary":{"min":-0.007,"q02":null,"q25":null,"median":null,"q75":null,"q98":null,"max":0.201,"avg":0.009197976326842345,"sd":null}}]}
+{
+  "meta": {
+    "name": "openaq-api",
+    "website": "/",
+    "page": 1,
+    "limit": 100,
+    "found": 1
+  },
+  "results": [
+    {
+      "id": 4272103,
+      "name": "nox ppm",
+      "parameter": {
+        "id": 19840,
+        "name": "nox",
+        "units": "ppm",
+        "displayName": "NOx"
+      },
+      "datetimeFirst": {
+        "utc": "2023-03-29T18:00:00Z",
+        "local": "2023-03-29T12:00:00-06:00"
+      },
+      "datetimeLast": {
+        "utc": "2026-09-10T14:00:00Z",
+        "local": "2026-09-10T08:00:00-06:00"
+      },
+      "coverage": {
+        "expectedCount": 1,
+        "expectedInterval": "01:00:00",
+        "observedCount": 24142,
+        "observedInterval": "24142:00:00",
+        "percentComplete": 2414200.0,
+        "percentCoverage": 2414200.0,
+        "datetimeFrom": {
+          "utc": "2023-03-29T18:00:00Z",
+          "local": "2023-03-29T12:00:00-06:00"
+        },
+        "datetimeTo": {
+          "utc": "2026-09-10T14:00:00Z",
+          "local": "2026-09-10T08:00:00-06:00"
+        }
+      },
+      "latest": {
+        "datetime": {
+          "utc": "2026-09-10T14:00:00Z",
+          "local": "2026-09-10T08:00:00-06:00"
+        },
+        "value": 0.03,
+        "coordinates": {
+          "latitude": 35.1353,
+          "longitude": -106.584702
+        }
+      },
+      "summary": {
+        "min": -0.007,
+        "q02": null,
+        "q25": null,
+        "median": null,
+        "q75": null,
+        "q98": null,
+        "max": 0.201,
+        "avg": 0.009197976326842345,
+        "sd": null
+      }
+    }
+  ]
+}

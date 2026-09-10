@@ -1,1 +1,67 @@
-{"meta":{"name":"openaq-api","website":"/","page":1,"limit":100,"found":1},"results":[{"id":3918,"name":"so2 ppm","parameter":{"id":9,"name":"so2","units":"ppm","displayName":"SO₂"},"datetimeFirst":{"utc":"2016-03-06T20:00:00Z","local":"2016-03-06T13:00:00-07:00"},"datetimeLast":{"utc":"2026-08-19T12:00:00Z","local":"2026-08-19T06:00:00-06:00"},"coverage":{"expectedCount":1,"expectedInterval":"01:00:00","observedCount":71482,"observedInterval":"71482:00:00","percentComplete":7148200.0,"percentCoverage":7148200.0,"datetimeFrom":{"utc":"2016-03-06T20:00:00Z","local":"2016-03-06T13:00:00-07:00"},"datetimeTo":{"utc":"2026-08-19T12:00:00Z","local":"2026-08-19T06:00:00-06:00"}},"latest":{"datetime":{"utc":"2026-08-19T12:00:00Z","local":"2026-08-19T06:00:00-06:00"},"value":0.0004,"coordinates":{"latitude":35.1353,"longitude":-106.584702}},"summary":{"min":0.0,"q02":null,"q25":null,"median":null,"q75":null,"q98":null,"max":0.01,"avg":0.0004021463570515162,"sd":null}}]}
+{
+  "meta": {
+    "name": "openaq-api",
+    "website": "/",
+    "page": 1,
+    "limit": 100,
+    "found": 1
+  },
+  "results": [
+    {
+      "id": 3918,
+      "name": "so2 ppm",
+      "parameter": {
+        "id": 9,
+        "name": "so2",
+        "units": "ppm",
+        "displayName": "SO\u2082"
+      },
+      "datetimeFirst": {
+        "utc": "2016-03-06T20:00:00Z",
+        "local": "2016-03-06T13:00:00-07:00"
+      },
+      "datetimeLast": {
+        "utc": "2026-09-10T14:00:00Z",
+        "local": "2026-09-10T08:00:00-06:00"
+      },
+      "coverage": {
+        "expectedCount": 1,
+        "expectedInterval": "01:00:00",
+        "observedCount": 71984,
+        "observedInterval": "71984:00:00",
+        "percentComplete": 7198400.0,
+        "percentCoverage": 7198400.0,
+        "datetimeFrom": {
+          "utc": "2016-03-06T20:00:00Z",
+          "local": "2016-03-06T13:00:00-07:00"
+        },
+        "datetimeTo": {
+          "utc": "2026-09-10T14:00:00Z",
+          "local": "2026-09-10T08:00:00-06:00"
+        }
+      },
+      "latest": {
+        "datetime": {
+          "utc": "2026-09-10T14:00:00Z",
+          "local": "2026-09-10T08:00:00-06:00"
+        },
+        "value": 0.0008,
+        "coordinates": {
+          "latitude": 35.1353,
+          "longitude": -106.584702
+        }
+      },
+      "summary": {
+        "min": 0.0,
+        "q02": null,
+        "q25": null,
+        "median": null,
+        "q75": null,
+        "q98": null,
+        "max": 0.01,
+        "avg": 0.0004021463570515162,
+        "sd": null
+      }
+    }
+  ]
+}
