@@ -28,6 +28,8 @@ logs/
 # ----------------------------
 data/output/*
 !data/output/.gitkeep
+data/stream/output/
+data/stream/checkpoints/
 
 # ----------------------------
 # Spark

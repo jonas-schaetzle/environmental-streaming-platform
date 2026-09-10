@@ -1,0 +1,2 @@
+{"source":"openaq","location_id":2178,"sensor_id":3916,"parameter":"no2","parameter_display_name":"NO2","value":0.007,"unit":"ppm","measured_at_utc":"2026-08-13T15:00:00Z","latitude":35.1353,"longitude":-106.584702}
+{"source":"openaq","location_id":2178,"sensor_id":3920,"parameter":"pm25","parameter_display_name":"PM2.5","value":4.0,"unit":"ug/m3","measured_at_utc":"2026-08-13T15:00:00Z","latitude":35.1353,"longitude":-106.584702}
