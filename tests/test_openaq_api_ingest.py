@@ -1,3 +1,4 @@
+import sys
 from typing import Any
 
 import pytest
@@ -131,3 +132,17 @@ def test_ingest_location_latest_writes_latest_and_sensor_payloads(
         "https://api.openaq.org/v3/sensors/3916",
         "https://api.openaq.org/v3/sensors/3918",
     ]
+
+
+def test_parse_args_accepts_location_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["openaq_api_ingest.py", "--location-id", "1234"],
+    )
+
+    args = openaq_api_ingest.parse_args()
+
+    assert args.location_id == 1234

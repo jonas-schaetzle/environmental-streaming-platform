@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 from pathlib import Path
@@ -79,9 +80,23 @@ def ingest_location_latest(location_id: int, api_key: str) -> None:
         write_json(sensor_payload, SENSOR_OUTPUT_DIR / f"sensor_{sensor_id}.json")
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Download OpenAQ latest measurements and sensor metadata as raw JSON."
+    )
+    parser.add_argument(
+        "--location-id",
+        type=int,
+        default=DEFAULT_LOCATION_ID,
+        help=f"OpenAQ location ID to ingest. Defaults to {DEFAULT_LOCATION_ID}.",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = parse_args()
     api_key = get_required_env_var("OPENAQ_API_KEY")
-    ingest_location_latest(DEFAULT_LOCATION_ID, api_key)
+    ingest_location_latest(args.location_id, api_key)
 
 
 if __name__ == "__main__":
