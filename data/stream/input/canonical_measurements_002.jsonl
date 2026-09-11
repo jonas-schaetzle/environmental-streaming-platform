@@ -1,0 +1,2 @@
+{"source":"openaq","location_id":2178,"sensor_id":3918,"parameter":"so2","parameter_display_name":"SO2","value":0.0004,"unit":"ppm","measured_at_utc":"2026-08-13T15:05:00Z","latitude":35.1353,"longitude":-106.584702}
+{"source":"openaq","location_id":2178,"sensor_id":3917,"parameter":"o3","parameter_display_name":"O3","value":0.037,"unit":"ppm","measured_at_utc":"2026-08-13T15:05:00Z","latitude":35.1353,"longitude":-106.584702}
