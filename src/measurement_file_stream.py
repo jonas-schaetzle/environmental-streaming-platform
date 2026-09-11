@@ -1,4 +1,5 @@
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql.functions import col
 from pyspark.sql.streaming import StreamingQuery
 from pyspark.sql.types import (
     DoubleType,
@@ -52,6 +53,19 @@ def read_measurement_stream(spark: SparkSession) -> DataFrame:
     )
 
 
+def filter_valid_measurements(measurements: DataFrame) -> DataFrame:
+    return measurements.filter(
+        col("source").isNotNull()
+        & col("location_id").isNotNull()
+        & col("sensor_id").isNotNull()
+        & col("parameter").isNotNull()
+        & col("value").isNotNull()
+        & (col("value") >= 0)
+        & col("unit").isNotNull()
+        & col("measured_at_utc").isNotNull()
+    )
+
+
 def write_measurement_stream(measurements: DataFrame) -> StreamingQuery:
     return (
         measurements.writeStream
@@ -67,7 +81,8 @@ def main() -> None:
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 
-    query = write_measurement_stream(read_measurement_stream(spark))
+    measurements = filter_valid_measurements(read_measurement_stream(spark))
+    query = write_measurement_stream(measurements)
     query.awaitTermination()
 
     spark.stop()
