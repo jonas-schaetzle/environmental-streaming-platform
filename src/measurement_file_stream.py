@@ -1,5 +1,5 @@
-from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql import Column, DataFrame, SparkSession
+from pyspark.sql.functions import col, concat_ws, lit, when
 from pyspark.sql.streaming import StreamingQuery
 from pyspark.sql.types import (
     DoubleType,
@@ -14,6 +14,8 @@ from pyspark.sql.types import (
 STREAM_INPUT_PATH = "data/stream/input"
 STREAM_OUTPUT_PATH = "data/stream/output/canonical_measurements"
 CHECKPOINT_PATH = "data/stream/checkpoints/canonical_measurements"
+INVALID_STREAM_OUTPUT_PATH = "data/stream/output/invalid_measurements"
+INVALID_CHECKPOINT_PATH = "data/stream/checkpoints/invalid_measurements"
 LOCAL_SHUFFLE_PARTITIONS = "4"
 
 
@@ -54,7 +56,28 @@ def read_measurement_stream(spark: SparkSession) -> DataFrame:
 
 
 def filter_valid_measurements(measurements: DataFrame) -> DataFrame:
-    return measurements.filter(
+    return measurements.filter(valid_measurement_condition())
+
+
+def filter_invalid_measurements(measurements: DataFrame) -> DataFrame:
+    return measurements.filter(~valid_measurement_condition()).withColumn(
+        "validation_error",
+        concat_ws(
+            ",",
+            when(col("source").isNull(), lit("missing_source")),
+            when(col("location_id").isNull(), lit("missing_location_id")),
+            when(col("sensor_id").isNull(), lit("missing_sensor_id")),
+            when(col("parameter").isNull(), lit("missing_parameter")),
+            when(col("value").isNull(), lit("missing_value")),
+            when(col("value") < 0, lit("negative_value")),
+            when(col("unit").isNull(), lit("missing_unit")),
+            when(col("measured_at_utc").isNull(), lit("missing_measured_at_utc")),
+        ),
+    )
+
+
+def valid_measurement_condition() -> Column:
+    return (
         col("source").isNotNull()
         & col("location_id").isNotNull()
         & col("sensor_id").isNotNull()
@@ -66,14 +89,18 @@ def filter_valid_measurements(measurements: DataFrame) -> DataFrame:
     )
 
 
-def write_measurement_stream(measurements: DataFrame) -> StreamingQuery:
+def write_measurement_stream(
+    measurements: DataFrame,
+    output_path: str,
+    checkpoint_path: str,
+) -> StreamingQuery:
     return (
         measurements.writeStream
         .format("parquet")
         .outputMode("append")
-        .option("checkpointLocation", CHECKPOINT_PATH)
+        .option("checkpointLocation", checkpoint_path)
         .trigger(availableNow=True)
-        .start(STREAM_OUTPUT_PATH)
+        .start(output_path)
     )
 
 
@@ -81,9 +108,23 @@ def main() -> None:
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 
-    measurements = filter_valid_measurements(read_measurement_stream(spark))
-    query = write_measurement_stream(measurements)
-    query.awaitTermination()
+    measurements = read_measurement_stream(spark)
+    valid_measurements = filter_valid_measurements(measurements)
+    invalid_measurements = filter_invalid_measurements(measurements)
+
+    valid_query = write_measurement_stream(
+        valid_measurements,
+        output_path=STREAM_OUTPUT_PATH,
+        checkpoint_path=CHECKPOINT_PATH,
+    )
+    invalid_query = write_measurement_stream(
+        invalid_measurements,
+        output_path=INVALID_STREAM_OUTPUT_PATH,
+        checkpoint_path=INVALID_CHECKPOINT_PATH,
+    )
+
+    valid_query.awaitTermination()
+    invalid_query.awaitTermination()
 
     spark.stop()
 

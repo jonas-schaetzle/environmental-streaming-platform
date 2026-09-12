@@ -3,6 +3,7 @@ from pyspark.sql.types import DoubleType, LongType, StringType, TimestampType
 
 from src.measurement_file_stream import (
     canonical_measurement_schema,
+    filter_invalid_measurements,
     filter_valid_measurements,
 )
 
@@ -59,3 +60,32 @@ def test_filter_valid_measurements_removes_incomplete_or_invalid_events(
     assert len(rows) == 1
     assert rows[0]["sensor_id"] == 3916
     assert rows[0]["parameter"] == "no2"
+
+
+def test_filter_invalid_measurements_keeps_invalid_events_with_error_reason(
+    spark: SparkSession,
+) -> None:
+    measurements = spark.createDataFrame(
+        [
+            ("openaq", 2178, 3916, "no2", "NO2", 0.007, "ppm", "2026-08-13 15:00:00"),
+            ("openaq", 2178, 3918, "so2", "SO2", -0.1, None, "2026-08-13 15:00:00"),
+        ],
+        [
+            "source",
+            "location_id",
+            "sensor_id",
+            "parameter",
+            "parameter_display_name",
+            "value",
+            "unit",
+            "measured_at_utc",
+        ],
+    )
+
+    result = filter_invalid_measurements(measurements)
+
+    rows = result.collect()
+
+    assert len(rows) == 1
+    assert rows[0]["sensor_id"] == 3918
+    assert rows[0]["validation_error"] == "negative_value,missing_unit"

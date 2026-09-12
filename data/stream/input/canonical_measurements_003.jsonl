@@ -1,0 +1,2 @@
+{"source":"openaq","location_id":2178,"sensor_id":25227,"parameter":"co","parameter_display_name":"CO","value":0.1,"unit":"ppm","measured_at_utc":"2026-08-13T15:10:00Z","latitude":35.1353,"longitude":-106.584702}
+{"source":"openaq","location_id":2178,"sensor_id":4272103,"parameter":"nox","parameter_display_name":"NOx","value":-0.3,"measured_at_utc":"2026-08-13T15:10:00Z","latitude":35.1353,"longitude":-106.584702}
