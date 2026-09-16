@@ -6,6 +6,7 @@ if __package__:
     from .measurement_file_stream import (
         LOCAL_SHUFFLE_PARTITIONS,
         canonical_measurement_schema,
+        filter_invalid_measurements,
         filter_valid_measurements,
     )
     from .spark_runtime import configure_java_runtime
@@ -13,6 +14,7 @@ else:
     from measurement_file_stream import (
         LOCAL_SHUFFLE_PARTITIONS,
         canonical_measurement_schema,
+        filter_invalid_measurements,
         filter_valid_measurements,
     )
     from spark_runtime import configure_java_runtime
@@ -23,6 +25,10 @@ KAFKA_TOPIC = "environment.measurements.raw"
 SPARK_KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.13:4.2.0"
 KAFKA_STREAM_OUTPUT_PATH = "data/stream/output/kafka_canonical_measurements"
 KAFKA_STREAM_CHECKPOINT_PATH = "data/stream/checkpoints/kafka_canonical_measurements"
+KAFKA_INVALID_STREAM_OUTPUT_PATH = "data/stream/output/kafka_invalid_measurements"
+KAFKA_INVALID_STREAM_CHECKPOINT_PATH = (
+    "data/stream/checkpoints/kafka_invalid_measurements"
+)
 
 
 def create_spark_session() -> SparkSession:
@@ -87,6 +93,17 @@ def write_kafka_measurement_stream(measurements: DataFrame) -> StreamingQuery:
     )
 
 
+def write_invalid_kafka_measurement_stream(measurements: DataFrame) -> StreamingQuery:
+    return (
+        measurements.writeStream
+        .format("parquet")
+        .outputMode("append")
+        .option("checkpointLocation", KAFKA_INVALID_STREAM_CHECKPOINT_PATH)
+        .trigger(availableNow=True)
+        .start(KAFKA_INVALID_STREAM_OUTPUT_PATH)
+    )
+
+
 def main() -> None:
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
@@ -94,9 +111,13 @@ def main() -> None:
     kafka_messages = read_kafka_stream(spark)
     parsed_measurements = parse_kafka_measurements(kafka_messages)
     valid_measurements = filter_valid_measurements(parsed_measurements)
+    invalid_measurements = filter_invalid_measurements(parsed_measurements)
 
-    query = write_kafka_measurement_stream(valid_measurements)
-    query.awaitTermination()
+    valid_query = write_kafka_measurement_stream(valid_measurements)
+    invalid_query = write_invalid_kafka_measurement_stream(invalid_measurements)
+
+    valid_query.awaitTermination()
+    invalid_query.awaitTermination()
 
     spark.stop()
 

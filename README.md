@@ -16,7 +16,7 @@ The repository currently contains:
 - local Apache Kafka via Docker Compose
 - Python Kafka producer and consumer examples
 - JSONL export for canonical measurement events
-- Spark Structured Streaming from Kafka to Parquet
+- Spark Structured Streaming from Kafka to valid and quarantine Parquet outputs
 - validation and quality-report helpers
 - focused pytest coverage for transformation and Kafka helper logic
 
@@ -78,6 +78,8 @@ Run the Spark Kafka stream:
 python src/measurement_kafka_stream.py
 ```
 
+The Kafka stream writes valid events to `data/stream/output/kafka_canonical_measurements` and invalid events to `data/stream/output/kafka_invalid_measurements`. Invalid events keep Kafka metadata such as topic, partition, offset, key, and raw value for traceability.
+
 Generated local outputs are written under:
 
 - `src/` for application code
@@ -90,7 +92,6 @@ Generated local outputs are written under:
 
 Next steps:
 
-- add a Spark Kafka stream quality/quarantine path
 - normalize source-specific units into canonical unit values
 - introduce event-time windowing on Kafka input
 - prepare the lakehouse layer and cloud deployment path
