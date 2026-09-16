@@ -66,6 +66,14 @@ def filter_valid_measurements(measurements: DataFrame) -> DataFrame:
     return measurements.filter(valid_measurement_condition())
 
 
+def normalize_measurement_units(measurements: DataFrame) -> DataFrame:
+    return measurements.withColumn(
+        "unit",
+        when(col("unit").isin("ug/m3", "µg/m³"), lit("µg/m³"))
+        .otherwise(col("unit")),
+    )
+
+
 def filter_invalid_measurements(measurements: DataFrame) -> DataFrame:
     return measurements.filter(~valid_measurement_condition()).withColumn(
         "validation_error",
@@ -116,7 +124,8 @@ def main() -> None:
     spark.sparkContext.setLogLevel("WARN")
 
     measurements = read_measurement_stream(spark)
-    valid_measurements = filter_valid_measurements(measurements)
+    normalized_measurements = normalize_measurement_units(measurements)
+    valid_measurements = filter_valid_measurements(normalized_measurements)
     invalid_measurements = filter_invalid_measurements(measurements)
 
     valid_query = write_measurement_stream(

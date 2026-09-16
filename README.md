@@ -17,6 +17,7 @@ The repository currently contains:
 - Python Kafka producer and consumer examples
 - JSONL export for canonical measurement events
 - Spark Structured Streaming from Kafka to valid and quarantine Parquet outputs
+- canonical unit normalization for measurement outputs
 - validation and quality-report helpers
 - focused pytest coverage for transformation and Kafka helper logic
 
@@ -80,6 +81,8 @@ python src/measurement_kafka_stream.py
 
 The Kafka stream writes valid events to `data/stream/output/kafka_canonical_measurements` and invalid events to `data/stream/output/kafka_invalid_measurements`. Invalid events keep Kafka metadata such as topic, partition, offset, key, and raw value for traceability.
 
+Valid measurement outputs normalize equivalent unit spellings, for example `ug/m3` to `µg/m³`.
+
 Generated local outputs are written under:
 
 - `src/` for application code
@@ -92,7 +95,6 @@ Generated local outputs are written under:
 
 Next steps:
 
-- normalize source-specific units into canonical unit values
 - introduce event-time windowing on Kafka input
 - prepare the lakehouse layer and cloud deployment path
 

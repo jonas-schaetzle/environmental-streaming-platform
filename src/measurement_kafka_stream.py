@@ -8,6 +8,7 @@ if __package__:
         canonical_measurement_schema,
         filter_invalid_measurements,
         filter_valid_measurements,
+        normalize_measurement_units,
     )
     from .spark_runtime import configure_java_runtime
 else:
@@ -16,6 +17,7 @@ else:
         canonical_measurement_schema,
         filter_invalid_measurements,
         filter_valid_measurements,
+        normalize_measurement_units,
     )
     from spark_runtime import configure_java_runtime
 
@@ -110,7 +112,8 @@ def main() -> None:
 
     kafka_messages = read_kafka_stream(spark)
     parsed_measurements = parse_kafka_measurements(kafka_messages)
-    valid_measurements = filter_valid_measurements(parsed_measurements)
+    normalized_measurements = normalize_measurement_units(parsed_measurements)
+    valid_measurements = filter_valid_measurements(normalized_measurements)
     invalid_measurements = filter_invalid_measurements(parsed_measurements)
 
     valid_query = write_kafka_measurement_stream(valid_measurements)

@@ -5,6 +5,7 @@ from src.measurement_file_stream import (
     canonical_measurement_schema,
     filter_invalid_measurements,
     filter_valid_measurements,
+    normalize_measurement_units,
 )
 
 
@@ -89,3 +90,29 @@ def test_filter_invalid_measurements_keeps_invalid_events_with_error_reason(
     assert len(rows) == 1
     assert rows[0]["sensor_id"] == 3918
     assert rows[0]["validation_error"] == "negative_value,missing_unit"
+
+
+def test_normalize_measurement_units_standardizes_micrograms_per_cubic_meter(
+    spark: SparkSession,
+) -> None:
+    measurements = spark.createDataFrame(
+        [
+            (3916, "ppm"),
+            (3919, "ug/m3"),
+            (3920, "µg/m³"),
+        ],
+        ["sensor_id", "unit"],
+    )
+
+    result = normalize_measurement_units(measurements)
+
+    rows = {
+        row["sensor_id"]: row["unit"]
+        for row in result.collect()
+    }
+
+    assert rows == {
+        3916: "ppm",
+        3919: "µg/m³",
+        3920: "µg/m³",
+    }
