@@ -61,7 +61,9 @@ def test_produce_events_sends_sensor_id_key_and_json_value(
                 "value": 4.0,
                 "unit": "ug/m3",
             }
-        ]
+        ],
+        bootstrap_servers="localhost:9092",
+        topic="environment.measurements.raw",
     )
 
     assert count == 1
@@ -83,3 +85,56 @@ def test_produce_events_sends_sensor_id_key_and_json_value(
             ),
         }
     ]
+
+
+def test_produce_events_accepts_custom_kafka_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    produced_messages: list[dict[str, Any]] = []
+
+    class FakeProducer:
+        def __init__(self, config: dict[str, str]) -> None:
+            assert config == {"bootstrap.servers": "broker:9092"}
+
+        def produce(self, topic: str, key: str, value: str) -> None:
+            produced_messages.append({"topic": topic, "key": key, "value": value})
+
+        def flush(self) -> None:
+            return None
+
+    monkeypatch.setattr(kafka_measurement_producer, "Producer", FakeProducer)
+
+    count = kafka_measurement_producer.produce_events(
+        [{"sensor_id": 3918, "value": 0.0004}],
+        bootstrap_servers="broker:9092",
+        topic="custom.measurements",
+    )
+
+    assert count == 1
+    assert produced_messages[0]["topic"] == "custom.measurements"
+    assert produced_messages[0]["key"] == "3918"
+
+
+def test_parse_args_returns_producer_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "kafka_measurement_producer.py",
+            "--input-path",
+            "data/example.jsonl",
+            "--bootstrap-servers",
+            "broker:9092",
+            "--topic",
+            "custom.measurements",
+        ],
+    )
+
+    result = kafka_measurement_producer.parse_args()
+
+    assert result == kafka_measurement_producer.ProducerConfig(
+        input_path=kafka_measurement_producer.Path("data/example.jsonl"),
+        bootstrap_servers="broker:9092",
+        topic="custom.measurements",
+    )

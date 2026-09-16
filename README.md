@@ -15,6 +15,7 @@ The repository currently contains:
 - file-based Spark Structured Streaming examples
 - local Apache Kafka via Docker Compose
 - Python Kafka producer and consumer examples
+- JSONL export for canonical measurement events
 - Spark Structured Streaming from Kafka to Parquet
 - validation and quality-report helpers
 - focused pytest coverage for transformation and Kafka helper logic
@@ -51,10 +52,16 @@ Create the local raw measurement topic if it does not exist yet:
 docker exec environmental-streaming-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic environment.measurements.raw --partitions 3 --replication-factor 1
 ```
 
-Produce sample canonical measurement events:
+Export canonical OpenAQ measurements from Parquet to JSONL:
 
 ```bash
-python src/kafka_measurement_producer.py
+python src/canonical_jsonl_export.py --input-path data/output/openaq_location_latest --output-path data/stream/input/openaq_location_latest.jsonl
+```
+
+Produce canonical measurement events to Kafka:
+
+```bash
+python src/kafka_measurement_producer.py --input-path data/stream/input/openaq_location_latest.jsonl --topic environment.measurements.raw --bootstrap-servers localhost:9092
 ```
 
 Consume messages for debugging:
@@ -81,8 +88,8 @@ Generated local outputs are written under:
 
 Next steps:
 
-- make Kafka producer input configurable for different sample files
 - add a Spark Kafka stream quality/quarantine path
+- normalize source-specific units into canonical unit values
 - introduce event-time windowing on Kafka input
 - prepare the lakehouse layer and cloud deployment path
 

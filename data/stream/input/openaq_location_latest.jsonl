@@ -1,0 +1,8 @@
+{"source":"openaq","location_id":2178,"sensor_id":3920,"parameter":"pm25","parameter_display_name":"PM2.5","value":3.8,"unit":"µg/m³","measured_at_utc":"2026-09-10T12:00:00.000Z","latitude":35.1353,"longitude":-106.584702}
+{"source":"openaq","location_id":2178,"sensor_id":3919,"parameter":"pm10","parameter_display_name":"PM10","value":12.0,"unit":"µg/m³","measured_at_utc":"2026-09-10T12:00:00.000Z","latitude":35.1353,"longitude":-106.584702}
+{"source":"openaq","location_id":2178,"sensor_id":3916,"parameter":"no2","parameter_display_name":"NO₂","value":0.017,"unit":"ppm","measured_at_utc":"2026-09-10T14:00:00.000Z","latitude":35.1353,"longitude":-106.584702}
+{"source":"openaq","location_id":2178,"sensor_id":3918,"parameter":"so2","parameter_display_name":"SO₂","value":8.0E-4,"unit":"ppm","measured_at_utc":"2026-09-10T14:00:00.000Z","latitude":35.1353,"longitude":-106.584702}
+{"source":"openaq","location_id":2178,"sensor_id":4272103,"parameter":"nox","parameter_display_name":"NOx","value":0.03,"unit":"ppm","measured_at_utc":"2026-09-10T14:00:00.000Z","latitude":35.1353,"longitude":-106.584702}
+{"source":"openaq","location_id":2178,"sensor_id":3917,"parameter":"o3","parameter_display_name":"O₃","value":0.008,"unit":"ppm","measured_at_utc":"2026-09-10T14:00:00.000Z","latitude":35.1353,"longitude":-106.584702}
+{"source":"openaq","location_id":2178,"sensor_id":4272226,"parameter":"no","parameter_display_name":"NO","value":0.013,"unit":"ppm","measured_at_utc":"2026-09-10T14:00:00.000Z","latitude":35.1353,"longitude":-106.584702}
+{"source":"openaq","location_id":2178,"sensor_id":25227,"parameter":"co","parameter_display_name":"CO","value":0.3,"unit":"ppm","measured_at_utc":"2026-09-10T14:00:00.000Z","latitude":35.1353,"longitude":-106.584702}
