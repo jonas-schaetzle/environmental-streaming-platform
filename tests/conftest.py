@@ -3,9 +3,13 @@ from collections.abc import Generator
 import pytest
 from pyspark.sql import SparkSession
 
+from src.spark_runtime import configure_java_runtime
+
 
 @pytest.fixture(scope="session")
 def spark() -> Generator[SparkSession]:
+    configure_java_runtime()
+
     session = (
         SparkSession.builder
         .appName("environmental-streaming-platform-tests")

@@ -28,13 +28,15 @@ Install Python dependencies:
 python -m pip install -r requirements.txt
 ```
 
-Spark 4.2.0 requires Java 17, 21, or 25. On macOS with Homebrew, Java 21 can be installed with:
+Spark 4.2.0 requires Java 17, 21, or 25. The project tries to auto-detect a local Java runtime before creating Spark sessions, including common Homebrew JDK paths on macOS.
+
+On macOS with Homebrew, Java 21 can be installed with:
 
 ```bash
 brew install openjdk@21
 ```
 
-For local Spark commands in this project, set:
+If Java is installed but Spark still cannot find it, set `JAVA_HOME` explicitly:
 
 ```bash
 export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home

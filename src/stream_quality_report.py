@@ -9,15 +9,19 @@ if __package__:
         STREAM_OUTPUT_PATH,
         canonical_measurement_schema,
     )
+    from .spark_runtime import configure_java_runtime
 else:
     from measurement_file_stream import (
         INVALID_STREAM_OUTPUT_PATH,
         STREAM_OUTPUT_PATH,
         canonical_measurement_schema,
     )
+    from spark_runtime import configure_java_runtime
 
 
 def create_spark_session() -> SparkSession:
+    configure_java_runtime()
+
     return (
         SparkSession.builder
         .appName("stream-quality-report")

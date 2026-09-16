@@ -2,6 +2,11 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import avg, col, count, max as spark_max, min as spark_min
 from pyspark.sql.types import DoubleType, StringType, StructField, StructType, TimestampType
 
+if __package__:
+    from .spark_runtime import configure_java_runtime
+else:
+    from spark_runtime import configure_java_runtime
+
 
 INPUT_PATH = "data/input/air_quality_sample.csv"
 OUTPUT_PATH = "data/output/air_quality_by_city_measurement"
@@ -21,6 +26,8 @@ schema = StructType(
 
 
 def create_spark_session() -> SparkSession:
+    configure_java_runtime()
+
     return (
         SparkSession.builder
         .appName("air-quality-batch")

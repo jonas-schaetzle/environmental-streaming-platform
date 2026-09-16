@@ -1,6 +1,11 @@
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, explode, lit, to_timestamp
 
+if __package__:
+    from .spark_runtime import configure_java_runtime
+else:
+    from spark_runtime import configure_java_runtime
+
 
 INPUT_PATH = "data/input/openaq_location_latest_raw.json"
 OUTPUT_PATH = "data/output/openaq_location_latest"
@@ -8,6 +13,8 @@ SENSOR_METADATA_INPUT_PATH = "data/input/openaq_sensors"
 
 
 def create_spark_session() -> SparkSession:
+    configure_java_runtime()
+
     return (
         SparkSession.builder
         .appName("openaq-latest-batch")

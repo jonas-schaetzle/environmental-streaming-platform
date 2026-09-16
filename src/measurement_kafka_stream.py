@@ -8,12 +8,14 @@ if __package__:
         canonical_measurement_schema,
         filter_valid_measurements,
     )
+    from .spark_runtime import configure_java_runtime
 else:
     from measurement_file_stream import (
         LOCAL_SHUFFLE_PARTITIONS,
         canonical_measurement_schema,
         filter_valid_measurements,
     )
+    from spark_runtime import configure_java_runtime
 
 
 KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
@@ -24,6 +26,8 @@ KAFKA_STREAM_CHECKPOINT_PATH = "data/stream/checkpoints/kafka_canonical_measurem
 
 
 def create_spark_session() -> SparkSession:
+    configure_java_runtime()
+
     return (
         SparkSession.builder
         .appName("measurement-kafka-stream")

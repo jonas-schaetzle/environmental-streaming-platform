@@ -5,6 +5,11 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import struct, to_json
 
+if __package__:
+    from .spark_runtime import configure_java_runtime
+else:
+    from spark_runtime import configure_java_runtime
+
 
 DEFAULT_INPUT_PATH = Path("data/output/openaq_location_latest")
 DEFAULT_OUTPUT_PATH = Path("data/stream/input/openaq_location_latest.jsonl")
@@ -17,6 +22,8 @@ class ExportConfig:
 
 
 def create_spark_session() -> SparkSession:
+    configure_java_runtime()
+
     return (
         SparkSession.builder
         .appName("canonical-jsonl-export")
