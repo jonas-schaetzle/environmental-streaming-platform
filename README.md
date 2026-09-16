@@ -2,23 +2,89 @@
 
 Cloud-oriented streaming data platform for heterogeneous environmental data.
 
-The project is intentionally built step by step. The first goal is to learn and demonstrate Apache Spark fundamentals locally before adding Kafka, cloud infrastructure, Iceberg, observability, and production-style platform concerns.
+The project is intentionally built step by step. It currently demonstrates a local Spark and Kafka streaming path before moving toward cloud infrastructure, Iceberg, observability, and production-style platform concerns.
 
 ## Current Phase
 
-Phase 0: local development setup.
+Local Kafka and Spark Structured Streaming foundation.
 
-This repository currently contains only the minimal structure needed to begin:
+The repository currently contains:
 
-- `data/input/` for small local input files
-- `data/output/` for generated local outputs
+- OpenAQ ingestion scripts for local source snapshots
+- batch transformations into a canonical measurement model
+- file-based Spark Structured Streaming examples
+- local Apache Kafka via Docker Compose
+- Python Kafka producer and consumer examples
+- Spark Structured Streaming from Kafka to Parquet
+- validation and quality-report helpers
+- focused pytest coverage for transformation and Kafka helper logic
+
+## Local Setup
+
+Install Python dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Spark 4.2.0 requires Java 17, 21, or 25. On macOS with Homebrew, Java 21 can be installed with:
+
+```bash
+brew install openjdk@21
+```
+
+For local Spark commands in this project, set:
+
+```bash
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+```
+
+Start local Kafka:
+
+```bash
+docker compose up -d
+```
+
+Create the local raw measurement topic if it does not exist yet:
+
+```bash
+docker exec environmental-streaming-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic environment.measurements.raw --partitions 3 --replication-factor 1
+```
+
+Produce sample canonical measurement events:
+
+```bash
+python src/kafka_measurement_producer.py
+```
+
+Consume messages for debugging:
+
+```bash
+python src/kafka_measurement_consumer.py
+```
+
+Run the Spark Kafka stream:
+
+```bash
+python src/measurement_kafka_stream.py
+```
+
+Generated local outputs are written under:
+
 - `src/` for application code
 - `tests/` for tests
-- `requirements.txt` and `pyproject.toml` as intentionally minimal dependency and project configuration placeholders
+- `data/output/` for batch outputs
+- `data/stream/output/` for streaming outputs
+- `data/stream/checkpoints/` for Spark checkpoints
 
 ## Near-Term Direction
 
-The next implementation step is a small Spark batch job over local environmental sample data. That step will introduce Spark deliberately, with explicit schemas, DataFrame transformations, actions, and Parquet output.
+Next steps:
+
+- make Kafka producer input configurable for different sample files
+- add a Spark Kafka stream quality/quarantine path
+- introduce event-time windowing on Kafka input
+- prepare the lakehouse layer and cloud deployment path
 
 ## Canonical Measurement Model
 
