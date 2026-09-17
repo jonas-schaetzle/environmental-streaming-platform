@@ -15,6 +15,7 @@ The repository currently contains:
 - file-based Spark Structured Streaming examples
 - local Apache Kafka via Docker Compose
 - Python Kafka producer and consumer examples
+- direct OpenAQ-to-Kafka producer with duplicate suppression
 - JSONL export for canonical measurement events
 - Spark Structured Streaming from Kafka to valid and quarantine Parquet outputs
 - canonical unit normalization for measurement outputs
@@ -27,6 +28,16 @@ Install Python dependencies:
 
 ```bash
 python -m pip install -r requirements.txt
+```
+
+Create the local environment file, add an OpenAQ API key, and load it into the
+current shell:
+
+```bash
+cp .env.example .env
+set -a
+source .env
+set +a
 ```
 
 Spark 4.2.0 requires Java 17, 21, or 25. The project tries to auto-detect a local Java runtime before creating Spark sessions, including common Homebrew JDK paths on macOS.
@@ -67,6 +78,19 @@ Produce canonical measurement events to Kafka:
 python src/kafka_measurement_producer.py --input-path data/stream/input/openaq_location_latest.jsonl --topic environment.measurements.raw --bootstrap-servers localhost:9092
 ```
 
+Fetch current OpenAQ measurements and produce new sensor timestamps directly to Kafka:
+
+```bash
+python src/openaq_kafka_producer.py --location-id 2178
+```
+
+Use a polling interval to keep the producer running. The local state file prevents an
+unchanged latest measurement from being published repeatedly:
+
+```bash
+python src/openaq_kafka_producer.py --location-id 2178 --poll-interval-seconds 300
+```
+
 Consume messages for debugging:
 
 ```bash
@@ -96,6 +120,7 @@ Generated local outputs are written under:
 Next steps:
 
 - introduce event-time windowing on Kafka input
+- write curated streaming results to Apache Iceberg tables
 - prepare the lakehouse layer and cloud deployment path
 
 ## Canonical Measurement Model

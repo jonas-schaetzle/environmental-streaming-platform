@@ -55,7 +55,12 @@ def produce_events(
         )
         produced_count += 1
 
-    producer.flush()
+    undelivered_count = producer.flush()
+    if undelivered_count:
+        raise RuntimeError(
+            f"Kafka producer could not deliver {undelivered_count} events."
+        )
+
     return produced_count
 
 
