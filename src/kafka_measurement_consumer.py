@@ -3,9 +3,11 @@ from typing import Any
 
 from confluent_kafka import Consumer, Message
 
+if __package__:
+    from .kafka_publisher import KAFKA_BOOTSTRAP_SERVERS, KAFKA_TOPIC
+else:
+    from kafka_publisher import KAFKA_BOOTSTRAP_SERVERS, KAFKA_TOPIC
 
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
-KAFKA_TOPIC = "environment.measurements.raw"
 KAFKA_CONSUMER_GROUP = "environmental-streaming-debug-consumer"
 
 

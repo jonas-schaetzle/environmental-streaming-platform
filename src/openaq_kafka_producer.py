@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import Any
 
 if __package__:
-    from .kafka_measurement_producer import (
+    from .kafka_publisher import (
         KAFKA_BOOTSTRAP_SERVERS,
         KAFKA_TOPIC,
         produce_events,
     )
-    from .openaq_api_ingest import (
+    from .openaq_client import (
         DEFAULT_LOCATION_ID,
         extract_sensor_ids,
         fetch_json,
@@ -20,12 +20,12 @@ if __package__:
         sensor_metadata_url,
     )
 else:
-    from kafka_measurement_producer import (
+    from kafka_publisher import (
         KAFKA_BOOTSTRAP_SERVERS,
         KAFKA_TOPIC,
         produce_events,
     )
-    from openaq_api_ingest import (
+    from openaq_client import (
         DEFAULT_LOCATION_ID,
         extract_sensor_ids,
         fetch_json,
@@ -35,7 +35,7 @@ else:
     )
 
 
-DEFAULT_STATE_PATH = Path("data/stream/state/openaq_kafka_producer.json")
+DEFAULT_STATE_PATH = Path("data/state/openaq_kafka_producer.json")
 
 
 @dataclass(frozen=True)
@@ -143,7 +143,9 @@ def fetch_location_events(
     api_key: str,
     sensor_payload_cache: dict[int, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    sensor_payload_cache = sensor_payload_cache if sensor_payload_cache is not None else {}
+    sensor_payload_cache = (
+        sensor_payload_cache if sensor_payload_cache is not None else {}
+    )
     latest_payload = fetch_json(
         latest_measurements_url(location_id),
         api_key=api_key,

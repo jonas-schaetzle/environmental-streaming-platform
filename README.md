@@ -1,32 +1,50 @@
 # Environmental Streaming Platform
 
-Cloud-oriented streaming data platform for heterogeneous environmental data.
+Production-oriented streaming data platform for real environmental measurements.
+The current implementation continuously ingests OpenAQ data, publishes canonical
+measurement events to Kafka, validates them with Spark Structured Streaming, and
+separates usable data from quarantined records.
 
-The project is intentionally built step by step. It currently demonstrates a local Spark and Kafka streaming path before moving toward cloud infrastructure, Iceberg, observability, and production-style platform concerns.
+## Architecture
 
-## Current Phase
+```text
+OpenAQ API
+    |
+    v
+OpenAQ Kafka Producer
+    |
+    v
+environment.measurements.canonical
+    |
+    v
+Spark Structured Streaming
+    |-- valid events ------> data/lake/canonical_measurements
+    `-- invalid events ----> data/lake/quarantine_measurements
+```
 
-Local Kafka and Spark Structured Streaming foundation.
+Kafka offsets and Spark checkpoints make the processing restartable. OpenAQ
+measurements are keyed by sensor ID, and the producer persists the latest published
+timestamp per sensor to avoid publishing unchanged API results repeatedly.
 
-The repository currently contains:
+## Current Capabilities
 
-- OpenAQ ingestion scripts for local source snapshots
-- batch transformations into a canonical measurement model
-- file-based Spark Structured Streaming examples
-- local Apache Kafka via Docker Compose
-- Python Kafka producer and consumer examples
-- direct OpenAQ-to-Kafka producer with duplicate suppression
-- JSONL export for canonical measurement events
-- Spark Structured Streaming from Kafka to valid and quarantine Parquet outputs
-- canonical unit normalization for measurement outputs
-- validation and quality-report helpers
-- focused pytest coverage for transformation and Kafka helper logic
+- direct ingestion from the OpenAQ API for one or more locations
+- canonical environmental measurement contract
+- duplicate suppression across producer restarts
+- cached sensor metadata during continuous polling
+- Kafka delivery verification and sensor-based partition keys
+- Spark Structured Streaming with checkpointed Kafka offsets
+- unit normalization for particulate measurements
+- validation with a separate quarantine output and Kafka trace metadata
+- local Kafka runtime through Docker Compose
 
 ## Local Setup
 
-Install Python dependencies:
+Create and activate a Python virtual environment, then install the dependencies:
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
@@ -40,104 +58,87 @@ source .env
 set +a
 ```
 
-Spark 4.2.0 requires Java 17, 21, or 25. The project tries to auto-detect a local Java runtime before creating Spark sessions, including common Homebrew JDK paths on macOS.
-
-On macOS with Homebrew, Java 21 can be installed with:
+Spark 4.2.0 requires Java 17, 21, or 25. The project auto-detects common Java
+installations, including Homebrew JDK paths on macOS. Java 21 can be installed with:
 
 ```bash
 brew install openjdk@21
 ```
 
-If Java is installed but Spark still cannot find it, set `JAVA_HOME` explicitly:
-
-```bash
-export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
-```
-
-Start local Kafka:
+Start Kafka:
 
 ```bash
 docker compose up -d
 ```
 
-Create the local raw measurement topic if it does not exist yet:
+Create the canonical measurement topic once:
 
 ```bash
-docker exec environmental-streaming-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic environment.measurements.raw --partitions 3 --replication-factor 1
+docker exec environmental-streaming-kafka /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 \
+  --create \
+  --if-not-exists \
+  --topic environment.measurements.canonical \
+  --partitions 3 \
+  --replication-factor 1
 ```
 
-Export canonical OpenAQ measurements from Parquet to JSONL:
+## Running The Pipeline
 
-```bash
-python src/canonical_jsonl_export.py --input-path data/output/openaq_location_latest --output-path data/stream/input/openaq_location_latest.jsonl
-```
-
-Produce canonical measurement events to Kafka:
-
-```bash
-python src/kafka_measurement_producer.py --input-path data/stream/input/openaq_location_latest.jsonl --topic environment.measurements.raw --bootstrap-servers localhost:9092
-```
-
-Fetch current OpenAQ measurements and produce new sensor timestamps directly to Kafka:
+Run one ingestion cycle for an OpenAQ location:
 
 ```bash
 python src/openaq_kafka_producer.py --location-id 2178
 ```
 
-Use a polling interval to keep the producer running. The local state file prevents an
-unchanged latest measurement from being published repeatedly:
+Repeat `--location-id` to ingest multiple locations, or poll continuously:
 
 ```bash
-python src/openaq_kafka_producer.py --location-id 2178 --poll-interval-seconds 300
+python src/openaq_kafka_producer.py \
+  --location-id 2178 \
+  --poll-interval-seconds 300
 ```
 
-Consume messages for debugging:
-
-```bash
-python src/kafka_measurement_consumer.py
-```
-
-Run the Spark Kafka stream:
+In another terminal, process all available Kafka events:
 
 ```bash
 python src/measurement_kafka_stream.py
 ```
 
-The Kafka stream writes valid events to `data/stream/output/kafka_canonical_measurements` and invalid events to `data/stream/output/kafka_invalid_measurements`. Invalid events keep Kafka metadata such as topic, partition, offset, key, and raw value for traceability.
+Inspect Kafka events without committing consumer offsets:
 
-Valid measurement outputs normalize equivalent unit spellings, for example `ug/m3` to `µg/m³`.
+```bash
+python src/kafka_measurement_consumer.py
+```
 
-Generated local outputs are written under:
+All runtime state, checkpoints, and measurement outputs live under `data/` and are
+excluded from version control.
 
-- `src/` for application code
-- `tests/` for tests
-- `data/output/` for batch outputs
-- `data/stream/output/` for streaming outputs
-- `data/stream/checkpoints/` for Spark checkpoints
+## Verification
 
-## Near-Term Direction
+```bash
+ruff check .
+pytest
+```
 
-Next steps:
+## Canonical Measurement Contract
 
-- introduce event-time windowing on Kafka input
-- write curated streaming results to Apache Iceberg tables
-- prepare the lakehouse layer and cloud deployment path
-
-## Canonical Measurement Model
-
-The platform normalizes source-specific environmental measurements into a small canonical model before writing analytical outputs.
-
-Current fields:
-
-- `source`: source system name, for example `openaq`
+- `source`: source system, currently `openaq`
 - `location_id`: source-specific location identifier
 - `sensor_id`: source-specific sensor identifier
-- `parameter`: measured quantity, for example `pm25`, `no2`, or `o3`
+- `parameter`: measured quantity such as `pm25`, `no2`, or `o3`
 - `parameter_display_name`: human-readable parameter name
-- `value`: measured numeric value
-- `unit`: measurement unit
+- `value`: numeric measurement value
+- `unit`: normalized measurement unit
 - `measured_at_utc`: event timestamp in UTC
 - `latitude`: measurement latitude
 - `longitude`: measurement longitude
 
-This model is intentionally small and will evolve as additional sources and streaming semantics are added.
+## Roadmap
+
+- ingest a curated set of real locations continuously
+- add event-time windows and late-event handling on Kafka input
+- replace the Parquet sink with Apache Iceberg tables
+- enrich measurements with weather data
+- expose air-quality trends, anomalies, and data-freshness metrics
+- add operational monitoring and cloud deployment

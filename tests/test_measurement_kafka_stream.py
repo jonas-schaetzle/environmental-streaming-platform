@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.types import BinaryType, LongType, StringType, StructField, StructType
 
-from src.measurement_file_stream import filter_invalid_measurements
+from src.measurement_model import filter_invalid_measurements
 from src.measurement_kafka_stream import parse_kafka_measurements
 
 
@@ -21,7 +21,7 @@ def test_parse_kafka_measurements_extracts_metadata_and_measurement(
     kafka_messages = spark.createDataFrame(
         [
             (
-                "environment.measurements.raw",
+                "environment.measurements.canonical",
                 2,
                 0,
                 "2026-08-13 15:00:01",
@@ -42,7 +42,7 @@ def test_parse_kafka_measurements_extracts_metadata_and_measurement(
 
     row = result.collect()[0]
 
-    assert row["kafka_topic"] == "environment.measurements.raw"
+    assert row["kafka_topic"] == "environment.measurements.canonical"
     assert row["kafka_partition"] == 2
     assert row["kafka_offset"] == 0
     assert row["kafka_key"] == "3916"
@@ -69,7 +69,7 @@ def test_invalid_kafka_measurements_keep_metadata_and_error_reason(
     kafka_messages = spark.createDataFrame(
         [
             (
-                "environment.measurements.raw",
+                "environment.measurements.canonical",
                 1,
                 14,
                 "2026-09-10 14:00:01",
@@ -89,7 +89,7 @@ def test_invalid_kafka_measurements_keep_metadata_and_error_reason(
 
     row = invalid_measurements.collect()[0]
 
-    assert row["kafka_topic"] == "environment.measurements.raw"
+    assert row["kafka_topic"] == "environment.measurements.canonical"
     assert row["kafka_partition"] == 1
     assert row["kafka_offset"] == 14
     assert row["kafka_key"] == "9999"
@@ -114,7 +114,7 @@ def test_malformed_kafka_json_becomes_invalid_measurement(
     kafka_messages = spark.createDataFrame(
         [
             (
-                "environment.measurements.raw",
+                "environment.measurements.canonical",
                 1,
                 15,
                 "2026-09-10 14:00:02",

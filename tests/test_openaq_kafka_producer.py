@@ -105,7 +105,7 @@ def test_run_cycle_publishes_new_events_and_persists_state(
     ) -> int:
         produced_events.extend(events)
         assert bootstrap_servers == "localhost:9092"
-        assert topic == "environment.measurements.raw"
+        assert topic == "environment.measurements.canonical"
         return len(events)
 
     monkeypatch.setattr(
