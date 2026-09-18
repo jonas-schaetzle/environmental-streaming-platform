@@ -44,13 +44,14 @@
 
 - Start every implementation change from an up-to-date `dev` branch.
 - Use a short-lived branch named `feature/*`, `fix/*`, `refactor/*`, or `chore/*`.
-- Open pull requests into `dev`; use a release pull request from `dev` to `main` for
-  completed milestones.
+- Review and merge completed short-lived branches into `dev` locally, then push
+  `dev` directly. Use pull requests only for releases from `dev` to `main`.
 - Keep `main` stable and `dev` as the integration branch for the next version.
 - Keep commits small and coherent. Use concise subjects such as `feat: ...`,
   `fix: ...`, `refactor: ...`, `test: ...`, `docs: ...`, or `chore: ...`.
 - Review the complete diff and report verification results before recommending a
   merge.
+- Delete merged local and remote working branches after `dev` is pushed.
 - Do not commit, push, merge, or delete branches unless the user explicitly asks.
 - GitHub Issues are intentionally not part of the workflow yet.
 

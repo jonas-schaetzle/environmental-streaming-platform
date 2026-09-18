@@ -1,5 +1,7 @@
 # Environmental Streaming Platform
 
+[![CI](https://github.com/jonas-schaetzle/environmental-streaming-platform/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/jonas-schaetzle/environmental-streaming-platform/actions/workflows/ci.yml)
+
 Production-oriented streaming data platform for real environmental measurements.
 The current implementation continuously ingests OpenAQ data, publishes canonical
 measurement events to Kafka, validates them with Spark Structured Streaming, and
@@ -120,6 +122,9 @@ excluded from version control.
 ruff check .
 pytest
 ```
+
+GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
+`dev` and `main`, and on release pull requests targeting `main`.
 
 ## Canonical Measurement Contract
 
