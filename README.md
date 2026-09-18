@@ -7,6 +7,12 @@ The current implementation continuously ingests OpenAQ data, publishes canonical
 measurement events to Kafka, validates them with Spark Structured Streaming, and
 separates usable data from quarantined records.
 
+## Project Documentation
+
+- [Projektstand](docs/projektstand.md)
+- [Projektziel](docs/projektziel.md)
+- [Arbeitsweise](docs/arbeitsweise.md)
+
 ## Architecture
 
 ```text

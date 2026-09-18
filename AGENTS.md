@@ -8,6 +8,7 @@
 - Prioritize practical, portfolio-relevant outcomes over isolated learning demos.
 - Do not reintroduce sample pipelines or tutorial-only code unless explicitly asked.
 - Keep the README aligned with user-facing setup, operation, and roadmap changes.
+- Treat the Markdown files under `docs/` as the maintained project documentation.
 
 ## Architecture Boundaries
 
@@ -47,10 +48,13 @@
 - Review and merge completed short-lived branches into `dev` locally, then push
   `dev` directly. Use pull requests only for releases from `dev` to `main`.
 - Keep `main` stable and `dev` as the integration branch for the next version.
-- Keep commits small and coherent. Use concise subjects such as `feat: ...`,
-  `fix: ...`, `refactor: ...`, `test: ...`, `docs: ...`, or `chore: ...`.
+- Keep commits small and coherent. Use concise imperative subjects without type
+  prefixes, such as `Add continuous integration`, `Handle transient OpenAQ
+  failures`, or `Refactor Iceberg sink`.
 - Review the complete diff and report verification results before recommending a
   merge.
+- After every merge and push, report the source and target branches explicitly in
+  the form `source-branch -> target-branch`.
 - Delete merged local and remote working branches after `dev` is pushed.
 - Do not commit, push, merge, or delete branches unless the user explicitly asks.
 - GitHub Issues are intentionally not part of the workflow yet.
