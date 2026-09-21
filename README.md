@@ -27,6 +27,7 @@ environment.measurements.canonical
     v
 Spark Structured Streaming
     |-- valid events ------> data/lake/canonical_measurements
+    |-- hourly aggregates -> data/lake/hourly_measurement_aggregates
     `-- invalid events ----> data/lake/quarantine_measurements
 ```
 
@@ -45,6 +46,7 @@ timestamp per sensor to avoid publishing unchanged API results repeatedly.
 - cached sensor metadata during continuous polling
 - Kafka delivery verification and sensor-based partition keys
 - Spark Structured Streaming with checkpointed Kafka offsets
+- hourly event-time aggregates with a two-hour late-data watermark
 - unit normalization for particulate measurements
 - validation with a separate quarantine output and Kafka trace metadata
 - local Kafka runtime through Docker Compose
@@ -129,6 +131,17 @@ In another terminal, process all available Kafka events:
 python src/measurement_kafka_stream.py
 ```
 
+Valid measurements are aggregated into one-hour event-time windows per source,
+location, parameter, and unit. Each finalized window contains the measurement count,
+average, minimum, maximum, and latest measurement timestamp. Spark waits up to two
+hours of event time for late measurements. Older events remain in the canonical sink
+but no longer update a finalized aggregate window.
+
+The aggregate checkpoint owns the window state. Changing the window duration,
+watermark delay, or grouping keys requires a deliberate new checkpoint and aggregate
+output path or a documented rebuild; do not delete or reuse the existing checkpoint
+implicitly.
+
 Inspect Kafka events without committing consumer offsets:
 
 ```bash
@@ -163,7 +176,6 @@ GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
 
 ## Roadmap
 
-- add event-time windows and late-event handling on Kafka input
 - replace the Parquet sink with Apache Iceberg tables
 - enrich measurements with weather data
 - expose air-quality trends, anomalies, and data-freshness metrics

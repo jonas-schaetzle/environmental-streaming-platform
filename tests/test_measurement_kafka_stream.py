@@ -1,8 +1,24 @@
+import json
+from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
+
 from pyspark.sql import SparkSession
-from pyspark.sql.types import BinaryType, LongType, StringType, StructField, StructType
+from pyspark.sql.types import (
+    BinaryType,
+    DoubleType,
+    LongType,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
+)
 
 from src.measurement_model import filter_invalid_measurements
-from src.measurement_kafka_stream import parse_kafka_measurements
+from src.measurement_kafka_stream import (
+    aggregate_measurements,
+    parse_kafka_measurements,
+)
 
 
 def test_parse_kafka_measurements_extracts_metadata_and_measurement(
@@ -137,3 +153,168 @@ def test_malformed_kafka_json_becomes_invalid_measurement(
         "missing_source,missing_location_id,missing_sensor_id,"
         "missing_parameter,missing_value,missing_unit,missing_measured_at_utc"
     )
+
+
+def test_aggregate_measurements_calculates_hourly_location_statistics(
+    spark: SparkSession,
+) -> None:
+    schema = StructType(
+        [
+            StructField("source", StringType(), nullable=False),
+            StructField("location_id", LongType(), nullable=False),
+            StructField("parameter", StringType(), nullable=False),
+            StructField("unit", StringType(), nullable=False),
+            StructField("value", DoubleType(), nullable=False),
+            StructField("measured_at_utc", TimestampType(), nullable=False),
+        ]
+    )
+    measurements = spark.createDataFrame(
+        [
+            (
+                "openaq",
+                2669,
+                "pm25",
+                "µg/m³",
+                10.0,
+                datetime(2026, 9, 21, 13, 5),
+            ),
+            (
+                "openaq",
+                2669,
+                "pm25",
+                "µg/m³",
+                14.0,
+                datetime(2026, 9, 21, 13, 45),
+            ),
+            (
+                "openaq",
+                2936,
+                "pm25",
+                "µg/m³",
+                8.0,
+                datetime(2026, 9, 21, 13, 30),
+            ),
+            (
+                "another-source",
+                2669,
+                "pm25",
+                "µg/m³",
+                100.0,
+                datetime(2026, 9, 21, 13, 30),
+            ),
+        ],
+        schema,
+    )
+
+    rows = {
+        (row["source"], row["location_id"]): row
+        for row in aggregate_measurements(measurements).collect()
+    }
+
+    munich_row = rows[("openaq", 2669)]
+    assert munich_row["window_start"] == datetime(2026, 9, 21, 13, 0)
+    assert munich_row["window_end"] == datetime(2026, 9, 21, 14, 0)
+    assert munich_row["measurement_count"] == 2
+    assert munich_row["average_value"] == 12.0
+    assert munich_row["minimum_value"] == 10.0
+    assert munich_row["maximum_value"] == 14.0
+    assert munich_row["latest_measured_at_utc"] == datetime(
+        2026,
+        9,
+        21,
+        13,
+        45,
+    )
+    assert rows[("openaq", 2936)]["measurement_count"] == 1
+    assert rows[("another-source", 2669)]["average_value"] == 100.0
+
+
+def test_event_time_watermark_finalizes_windows_and_drops_late_events(
+    spark: SparkSession,
+    tmp_path: Path,
+) -> None:
+    input_path = tmp_path / "input"
+    checkpoint_path = tmp_path / "checkpoint"
+    input_path.mkdir()
+    query_name = f"hourly_aggregates_{uuid4().hex}"
+    schema = StructType(
+        [
+            StructField("source", StringType(), nullable=False),
+            StructField("location_id", LongType(), nullable=False),
+            StructField("parameter", StringType(), nullable=False),
+            StructField("unit", StringType(), nullable=False),
+            StructField("value", DoubleType(), nullable=False),
+            StructField("measured_at_utc", TimestampType(), nullable=False),
+        ]
+    )
+    measurements = (
+        spark.readStream.schema(schema)
+        .option("maxFilesPerTrigger", 1)
+        .json(str(input_path))
+    )
+    aggregates = aggregate_measurements(
+        measurements,
+        watermark_delay="2 hours",
+    )
+    query = (
+        aggregates.writeStream.format("memory")
+        .queryName(query_name)
+        .outputMode("append")
+        .option("checkpointLocation", str(checkpoint_path))
+        .start()
+    )
+
+    def write_batch(file_name: str, events: list[dict[str, object]]) -> None:
+        content = "\n".join(json.dumps(event) for event in events) + "\n"
+        (input_path / file_name).write_text(content, encoding="utf-8")
+        query.processAllAvailable()
+
+    def measurement_event(
+        location_id: int,
+        value: float,
+        measured_at_utc: str,
+    ) -> dict[str, object]:
+        return {
+            "source": "openaq",
+            "location_id": location_id,
+            "parameter": "pm25",
+            "unit": "ug/m3",
+            "value": value,
+            "measured_at_utc": measured_at_utc,
+        }
+
+    try:
+        write_batch(
+            "batch-1.jsonl",
+            [
+                measurement_event(2669, 10.0, "2026-09-21T10:10:00Z"),
+                measurement_event(2669, 20.0, "2026-09-21T10:40:00Z"),
+            ],
+        )
+        write_batch(
+            "batch-2.jsonl",
+            [measurement_event(2936, 8.0, "2026-09-21T13:05:00Z")],
+        )
+        write_batch(
+            "batch-3.jsonl",
+            [measurement_event(3071, 12.0, "2026-09-21T14:05:00Z")],
+        )
+
+        finalized_rows = spark.table(query_name).collect()
+        assert len(finalized_rows) == 1
+        assert finalized_rows[0]["source"] == "openaq"
+        assert finalized_rows[0]["location_id"] == 2669
+        assert finalized_rows[0]["measurement_count"] == 2
+        assert finalized_rows[0]["average_value"] == 15.0
+
+        write_batch(
+            "batch-4-late.jsonl",
+            [measurement_event(2669, 30.0, "2026-09-21T10:30:00Z")],
+        )
+
+        rows_after_late_event = spark.table(query_name).collect()
+        assert len(rows_after_late_event) == 1
+        assert rows_after_late_event[0]["measurement_count"] == 2
+        assert rows_after_late_event[0]["average_value"] == 15.0
+    finally:
+        query.stop()

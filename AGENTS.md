@@ -19,7 +19,7 @@
 - `src/measurement_model.py` owns the canonical contract, normalization, validation,
   and quarantine reasons.
 - `src/measurement_kafka_stream.py` owns Spark stream orchestration, checkpoints,
-  and valid/quarantine sinks.
+  and valid, quarantine, and hourly aggregate sinks.
 - `src/kafka_measurement_consumer.py` is a diagnostic reader and must not commit
   consumer offsets.
 - `src/spark_runtime.py` owns local Spark and Java runtime discovery.
