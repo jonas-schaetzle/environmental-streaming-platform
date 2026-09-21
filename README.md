@@ -37,6 +37,9 @@ timestamp per sensor to avoid publishing unchanged API results repeatedly.
 ## Current Capabilities
 
 - direct ingestion from the OpenAQ API for one or more locations
+- curated configuration for Munich, Stuttgart, and Hamburg stations
+- bounded retry with exponential backoff for temporary OpenAQ failures
+- per-location failure isolation during multi-location polling
 - canonical environmental measurement contract
 - duplicate suppression across producer restarts
 - cached sensor metadata during continuous polling
@@ -93,18 +96,31 @@ docker exec environmental-streaming-kafka /opt/kafka/bin/kafka-topics.sh \
 
 ## Running The Pipeline
 
-Run one ingestion cycle for an OpenAQ location:
+Run one ingestion cycle for the curated locations in
+`config/openaq_locations.json`:
 
 ```bash
-python src/openaq_kafka_producer.py --location-id 2178
+python src/openaq_kafka_producer.py
 ```
 
-Repeat `--location-id` to ingest multiple locations, or poll continuously:
+Poll the configured locations continuously:
 
 ```bash
 python src/openaq_kafka_producer.py \
-  --location-id 2178 \
   --poll-interval-seconds 300
+```
+
+Each cycle writes one JSON report containing location coverage, fetched and published
+event counts, the latest measurement timestamp, freshness in seconds, and any
+location-specific request error. A temporary failure at one location does not block
+the remaining locations or stop continuous polling.
+
+Repeat `--location-id` to override the location file for an ad hoc run:
+
+```bash
+python src/openaq_kafka_producer.py \
+  --location-id 2669 \
+  --location-id 2936
 ```
 
 In another terminal, process all available Kafka events:
@@ -147,7 +163,6 @@ GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
 
 ## Roadmap
 
-- ingest a curated set of real locations continuously
 - add event-time windows and late-event handling on Kafka input
 - replace the Parquet sink with Apache Iceberg tables
 - enrich measurements with weather data
