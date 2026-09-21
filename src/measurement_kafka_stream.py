@@ -3,8 +3,8 @@ from pyspark.sql.functions import col, from_json
 from pyspark.sql.streaming import StreamingQuery
 
 if __package__:
-    from .measurement_file_stream import (
-        LOCAL_SHUFFLE_PARTITIONS,
+    from .kafka_publisher import KAFKA_BOOTSTRAP_SERVERS, KAFKA_TOPIC
+    from .measurement_model import (
         canonical_measurement_schema,
         filter_invalid_measurements,
         filter_valid_measurements,
@@ -12,8 +12,8 @@ if __package__:
     )
     from .spark_runtime import configure_java_runtime
 else:
-    from measurement_file_stream import (
-        LOCAL_SHUFFLE_PARTITIONS,
+    from kafka_publisher import KAFKA_BOOTSTRAP_SERVERS, KAFKA_TOPIC
+    from measurement_model import (
         canonical_measurement_schema,
         filter_invalid_measurements,
         filter_valid_measurements,
@@ -22,15 +22,12 @@ else:
     from spark_runtime import configure_java_runtime
 
 
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
-KAFKA_TOPIC = "environment.measurements.raw"
 SPARK_KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.13:4.2.0"
-KAFKA_STREAM_OUTPUT_PATH = "data/stream/output/kafka_canonical_measurements"
-KAFKA_STREAM_CHECKPOINT_PATH = "data/stream/checkpoints/kafka_canonical_measurements"
-KAFKA_INVALID_STREAM_OUTPUT_PATH = "data/stream/output/kafka_invalid_measurements"
-KAFKA_INVALID_STREAM_CHECKPOINT_PATH = (
-    "data/stream/checkpoints/kafka_invalid_measurements"
-)
+LOCAL_SHUFFLE_PARTITIONS = "4"
+KAFKA_STREAM_OUTPUT_PATH = "data/lake/canonical_measurements"
+KAFKA_STREAM_CHECKPOINT_PATH = "data/checkpoints/canonical_measurements"
+KAFKA_INVALID_STREAM_OUTPUT_PATH = "data/lake/quarantine_measurements"
+KAFKA_INVALID_STREAM_CHECKPOINT_PATH = "data/checkpoints/quarantine_measurements"
 
 
 def create_spark_session() -> SparkSession:

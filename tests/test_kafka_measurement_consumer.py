@@ -9,7 +9,7 @@ class FakeMessage:
         self,
         key: bytes | None,
         value: bytes,
-        topic: str = "environment.measurements.raw",
+        topic: str = "environment.measurements.canonical",
         partition: int = 2,
         offset: int = 4,
     ) -> None:
@@ -47,7 +47,7 @@ def test_decode_message_returns_kafka_metadata_and_json_value() -> None:
     result = kafka_measurement_consumer.decode_message(message)
 
     assert result == {
-        "topic": "environment.measurements.raw",
+        "topic": "environment.measurements.canonical",
         "partition": 2,
         "offset": 4,
         "key": "3916",
@@ -76,7 +76,7 @@ def test_consume_events_polls_until_timeout(monkeypatch) -> None:
             ]
 
         def subscribe(self, topics: list[str]) -> None:
-            assert topics == ["environment.measurements.raw"]
+            assert topics == ["environment.measurements.canonical"]
 
         def poll(self, timeout: float) -> Any:
             assert timeout == 0.1
@@ -97,7 +97,7 @@ def test_consume_events_polls_until_timeout(monkeypatch) -> None:
     assert closed is True
     assert result == [
         {
-            "topic": "environment.measurements.raw",
+            "topic": "environment.measurements.canonical",
             "partition": 2,
             "offset": 0,
             "key": "3920",
