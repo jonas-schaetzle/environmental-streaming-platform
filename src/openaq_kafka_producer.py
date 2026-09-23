@@ -2,8 +2,11 @@ import argparse
 import json
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+import requests
 
 if __package__:
     from .kafka_publisher import (
@@ -12,7 +15,6 @@ if __package__:
         produce_events,
     )
     from .openaq_client import (
-        DEFAULT_LOCATION_ID,
         extract_sensor_ids,
         fetch_json,
         get_required_env_var,
@@ -26,7 +28,6 @@ else:
         produce_events,
     )
     from openaq_client import (
-        DEFAULT_LOCATION_ID,
         extract_sensor_ids,
         fetch_json,
         get_required_env_var,
@@ -36,15 +37,67 @@ else:
 
 
 DEFAULT_STATE_PATH = Path("data/state/openaq_kafka_producer.json")
+DEFAULT_LOCATIONS_PATH = Path("config/openaq_locations.json")
+
+
+@dataclass(frozen=True)
+class OpenAQLocation:
+    location_id: int
+    name: str
+
+
+@dataclass(frozen=True)
+class LocationCycleReport:
+    location: OpenAQLocation
+    fetched_event_count: int
+    new_event_count: int
+    latest_measured_at_utc: str | None
+    error: str | None = None
+
+
+@dataclass(frozen=True)
+class IngestionCycleReport:
+    locations: tuple[LocationCycleReport, ...]
+    produced_event_count: int
 
 
 @dataclass(frozen=True)
 class OpenAQProducerConfig:
-    location_ids: tuple[int, ...] = (DEFAULT_LOCATION_ID,)
+    locations: tuple[OpenAQLocation, ...]
     bootstrap_servers: str = KAFKA_BOOTSTRAP_SERVERS
     topic: str = KAFKA_TOPIC
     state_path: Path = DEFAULT_STATE_PATH
     poll_interval_seconds: int = 0
+
+
+def load_locations(path: Path) -> tuple[OpenAQLocation, ...]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    configured_locations = payload.get("locations")
+
+    if not isinstance(configured_locations, list) or not configured_locations:
+        raise ValueError(f"{path} must define a non-empty locations list.")
+
+    locations = []
+    seen_ids = set()
+    for item in configured_locations:
+        if not isinstance(item, dict):
+            raise ValueError(f"Each location in {path} must be an object.")
+
+        location_id = item.get("id")
+        name = item.get("name")
+        if not isinstance(location_id, int) or location_id <= 0:
+            raise ValueError(
+                f"Each location in {path} must have a positive integer id."
+            )
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"Each location in {path} must have a non-empty name.")
+        if location_id in seen_ids:
+            raise ValueError(f"Duplicate OpenAQ location id {location_id} in {path}.")
+
+        seen_ids.add(location_id)
+        locations.append(OpenAQLocation(location_id=location_id, name=name.strip()))
+
+    return tuple(locations)
 
 
 def sensor_metadata_by_id(
@@ -167,21 +220,53 @@ def run_cycle(
     config: OpenAQProducerConfig,
     api_key: str,
     sensor_payload_cache: dict[int, dict[str, Any]] | None = None,
-) -> int:
-    events = [
-        event
-        for location_id in config.location_ids
-        for event in fetch_location_events(
-            location_id,
-            api_key,
-            sensor_payload_cache,
-        )
-    ]
+) -> IngestionCycleReport:
     state = load_state(config.state_path)
-    new_events = select_new_events(events, state)
+    new_events = []
+    location_reports = []
+
+    for location in config.locations:
+        try:
+            events = fetch_location_events(
+                location.location_id,
+                api_key,
+                sensor_payload_cache,
+            )
+        except requests.RequestException as error:
+            location_reports.append(
+                LocationCycleReport(
+                    location=location,
+                    fetched_event_count=0,
+                    new_event_count=0,
+                    latest_measured_at_utc=None,
+                    error=f"{type(error).__name__}: {error}",
+                )
+            )
+            continue
+
+        location_new_events = select_new_events(events, state)
+        new_events.extend(location_new_events)
+        location_reports.append(
+            LocationCycleReport(
+                location=location,
+                fetched_event_count=len(events),
+                new_event_count=len(location_new_events),
+                latest_measured_at_utc=max(
+                    (
+                        event["measured_at_utc"]
+                        for event in events
+                        if event.get("measured_at_utc") is not None
+                    ),
+                    default=None,
+                ),
+            )
+        )
 
     if not new_events:
-        return 0
+        return IngestionCycleReport(
+            locations=tuple(location_reports),
+            produced_event_count=0,
+        )
 
     produced_count = produce_events(
         new_events,
@@ -190,17 +275,67 @@ def run_cycle(
     )
     write_state(update_state(state, new_events), config.state_path)
 
-    return produced_count
+    return IngestionCycleReport(
+        locations=tuple(location_reports),
+        produced_event_count=produced_count,
+    )
+
+
+def measurement_age_seconds(
+    measured_at_utc: str | None,
+    now: datetime | None = None,
+) -> int | None:
+    if measured_at_utc is None:
+        return None
+
+    measured_at = datetime.fromisoformat(measured_at_utc.replace("Z", "+00:00"))
+    current_time = now or datetime.now(timezone.utc)
+    return max(0, int((current_time - measured_at).total_seconds()))
+
+
+def format_cycle_report(
+    report: IngestionCycleReport,
+    now: datetime | None = None,
+) -> str:
+    successful_count = sum(location.error is None for location in report.locations)
+    location_count = len(report.locations)
+    payload = {
+        "locations_configured": location_count,
+        "locations_succeeded": successful_count,
+        "coverage_percent": round(successful_count / location_count * 100, 1),
+        "events_fetched": sum(
+            location.fetched_event_count for location in report.locations
+        ),
+        "events_published": report.produced_event_count,
+        "locations": [
+            {
+                "id": location.location.location_id,
+                "name": location.location.name,
+                "events_fetched": location.fetched_event_count,
+                "events_new": location.new_event_count,
+                "latest_measured_at_utc": location.latest_measured_at_utc,
+                "freshness_seconds": measurement_age_seconds(
+                    location.latest_measured_at_utc,
+                    now,
+                ),
+                "error": location.error,
+            }
+            for location in report.locations
+        ],
+    }
+    return json.dumps(payload, separators=(",", ":"))
 
 
 def run(config: OpenAQProducerConfig, api_key: str) -> None:
     sensor_payload_cache: dict[int, dict[str, Any]] = {}
 
     while True:
-        produced_count = run_cycle(config, api_key, sensor_payload_cache)
-        print(f"Produced {produced_count} new OpenAQ events to {config.topic}")
+        report = run_cycle(config, api_key, sensor_payload_cache)
+        print(format_cycle_report(report), flush=True)
 
         if config.poll_interval_seconds == 0:
+            if any(location.error is not None for location in report.locations):
+                raise RuntimeError("OpenAQ ingestion was incomplete; see cycle report.")
             return
 
         time.sleep(config.poll_interval_seconds)
@@ -217,8 +352,14 @@ def parse_args() -> OpenAQProducerConfig:
         dest="location_ids",
         help=(
             "OpenAQ location ID. Repeat the option for multiple locations. "
-            f"Defaults to {DEFAULT_LOCATION_ID}."
+            "Overrides the configured location file."
         ),
+    )
+    parser.add_argument(
+        "--locations-path",
+        type=Path,
+        default=DEFAULT_LOCATIONS_PATH,
+        help="JSON file containing the default curated OpenAQ locations.",
     )
     parser.add_argument(
         "--bootstrap-servers",
@@ -248,8 +389,17 @@ def parse_args() -> OpenAQProducerConfig:
     if args.poll_interval_seconds < 0:
         parser.error("--poll-interval-seconds must be zero or greater")
 
+    locations = (
+        tuple(
+            OpenAQLocation(location_id=location_id, name=f"OpenAQ {location_id}")
+            for location_id in args.location_ids
+        )
+        if args.location_ids
+        else load_locations(args.locations_path)
+    )
+
     return OpenAQProducerConfig(
-        location_ids=tuple(args.location_ids or [DEFAULT_LOCATION_ID]),
+        locations=locations,
         bootstrap_servers=args.bootstrap_servers,
         topic=args.topic,
         state_path=args.state_path,

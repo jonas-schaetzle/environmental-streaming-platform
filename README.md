@@ -27,6 +27,7 @@ environment.measurements.canonical
     v
 Spark Structured Streaming
     |-- valid events ------> data/lake/canonical_measurements
+    |-- hourly aggregates -> data/lake/hourly_measurement_aggregates
     `-- invalid events ----> data/lake/quarantine_measurements
 ```
 
@@ -37,11 +38,15 @@ timestamp per sensor to avoid publishing unchanged API results repeatedly.
 ## Current Capabilities
 
 - direct ingestion from the OpenAQ API for one or more locations
+- curated configuration for Munich, Stuttgart, and Hamburg stations
+- bounded retry with exponential backoff for temporary OpenAQ failures
+- per-location failure isolation during multi-location polling
 - canonical environmental measurement contract
 - duplicate suppression across producer restarts
 - cached sensor metadata during continuous polling
 - Kafka delivery verification and sensor-based partition keys
 - Spark Structured Streaming with checkpointed Kafka offsets
+- hourly event-time aggregates with a two-hour late-data watermark
 - unit normalization for particulate measurements
 - validation with a separate quarantine output and Kafka trace metadata
 - local Kafka runtime through Docker Compose
@@ -93,18 +98,31 @@ docker exec environmental-streaming-kafka /opt/kafka/bin/kafka-topics.sh \
 
 ## Running The Pipeline
 
-Run one ingestion cycle for an OpenAQ location:
+Run one ingestion cycle for the curated locations in
+`config/openaq_locations.json`:
 
 ```bash
-python src/openaq_kafka_producer.py --location-id 2178
+python src/openaq_kafka_producer.py
 ```
 
-Repeat `--location-id` to ingest multiple locations, or poll continuously:
+Poll the configured locations continuously:
 
 ```bash
 python src/openaq_kafka_producer.py \
-  --location-id 2178 \
   --poll-interval-seconds 300
+```
+
+Each cycle writes one JSON report containing location coverage, fetched and published
+event counts, the latest measurement timestamp, freshness in seconds, and any
+location-specific request error. A temporary failure at one location does not block
+the remaining locations or stop continuous polling.
+
+Repeat `--location-id` to override the location file for an ad hoc run:
+
+```bash
+python src/openaq_kafka_producer.py \
+  --location-id 2669 \
+  --location-id 2936
 ```
 
 In another terminal, process all available Kafka events:
@@ -112,6 +130,17 @@ In another terminal, process all available Kafka events:
 ```bash
 python src/measurement_kafka_stream.py
 ```
+
+Valid measurements are aggregated into one-hour event-time windows per source,
+location, parameter, and unit. Each finalized window contains the measurement count,
+average, minimum, maximum, and latest measurement timestamp. Spark waits up to two
+hours of event time for late measurements. Older events remain in the canonical sink
+but no longer update a finalized aggregate window.
+
+The aggregate checkpoint owns the window state. Changing the window duration,
+watermark delay, or grouping keys requires a deliberate new checkpoint and aggregate
+output path or a documented rebuild; do not delete or reuse the existing checkpoint
+implicitly.
 
 Inspect Kafka events without committing consumer offsets:
 
@@ -147,8 +176,6 @@ GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
 
 ## Roadmap
 
-- ingest a curated set of real locations continuously
-- add event-time windows and late-event handling on Kafka input
 - replace the Parquet sink with Apache Iceberg tables
 - enrich measurements with weather data
 - expose air-quality trends, anomalies, and data-freshness metrics

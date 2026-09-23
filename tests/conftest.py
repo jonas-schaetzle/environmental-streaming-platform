@@ -11,10 +11,10 @@ def spark() -> Generator[SparkSession]:
     configure_java_runtime()
 
     session = (
-        SparkSession.builder
-        .appName("environmental-streaming-platform-tests")
+        SparkSession.builder.appName("environmental-streaming-platform-tests")
         .master("local[*]")
         .config("spark.sql.shuffle.partitions", "2")
+        .config("spark.sql.session.timeZone", "UTC")
         .getOrCreate()
     )
     session.sparkContext.setLogLevel("WARN")
