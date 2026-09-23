@@ -34,8 +34,10 @@ Add CI
 ## Merge- und Release-Standard
 
 - Vor dem Merge werden der vollständige Diff und alle relevanten Checks geprüft.
-- Fertige Arbeitsbranches werden lokal nach `dev` gemergt; anschließend wird
-  `dev` direkt gepusht.
+- Fertige Arbeitsbranches werden lokal mit `--no-ff` nach `dev` gemergt;
+  anschließend wird `dev` direkt gepusht.
+- Der Merge-Commit nennt Quelle und Ziel nach dem Muster
+  `Merge <source-branch> into dev`.
 - Nur Releases von `dev` nach `main` laufen über einen Pull Request.
 - Nach jedem Merge-Push werden Quelle und Ziel als
   `source-branch -> target-branch` gemeldet.
@@ -45,6 +47,13 @@ Beispiel für die Abschlussmeldung:
 
 ```text
 chore/update-git-guidance -> dev
+```
+
+Beispiel für Merge und Merge-Commit:
+
+```bash
+git merge --no-ff feature/event-time-aggregation \
+  -m "Merge feature/event-time-aggregation into dev"
 ```
 
 ## Qualitätsgates

@@ -45,8 +45,10 @@
 
 - Start every implementation change from an up-to-date `dev` branch.
 - Use a short-lived branch named `feature/*`, `fix/*`, `refactor/*`, or `chore/*`.
-- Review and merge completed short-lived branches into `dev` locally, then push
-  `dev` directly. Use pull requests only for releases from `dev` to `main`.
+- Review and merge completed short-lived branches into `dev` locally with
+  `--no-ff`, then push `dev` directly. Use the merge-commit subject
+  `Merge <source-branch> into dev` so the completed branch remains visible in
+  history. Use pull requests only for releases from `dev` to `main`.
 - Keep `main` stable and `dev` as the integration branch for the next version.
 - Keep commits small and coherent. Use concise imperative subjects without type
   prefixes, such as `Add continuous integration`, `Handle transient OpenAQ
