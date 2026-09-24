@@ -30,7 +30,7 @@ else:
     from spark_runtime import configure_java_runtime
 
 
-SPARK_KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.13:4.2.0"
+SPARK_KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.1"
 LOCAL_SHUFFLE_PARTITIONS = "4"
 KAFKA_STREAM_OUTPUT_PATH = "data/lake/canonical_measurements"
 KAFKA_STREAM_CHECKPOINT_PATH = "data/checkpoints/canonical_measurements"

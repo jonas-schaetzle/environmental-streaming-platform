@@ -71,7 +71,7 @@ source .env
 set +a
 ```
 
-Spark 4.2.0 requires Java 17, 21, or 25. The project auto-detects common Java
+Spark 4.1.1 requires Java 17 or 21. The project auto-detects common Java
 installations, including Homebrew JDK paths on macOS. Java 21 can be installed with:
 
 ```bash
