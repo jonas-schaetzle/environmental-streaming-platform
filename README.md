@@ -26,7 +26,8 @@ environment.measurements.canonical
     |
     v
 Spark Structured Streaming
-    |-- valid events ------> data/lake/canonical_measurements
+    |-- valid events ------> data/lake/canonical_measurements (Parquet transition)
+    |                  `---> local.lake.canonical_measurements (Iceberg)
     |-- hourly aggregates -> data/lake/hourly_measurement_aggregates
     `-- invalid events ----> data/lake/quarantine_measurements
 ```
@@ -46,6 +47,8 @@ timestamp per sensor to avoid publishing unchanged API results repeatedly.
 - cached sensor metadata during continuous polling
 - Kafka delivery verification and sensor-based partition keys
 - Spark Structured Streaming with checkpointed Kafka offsets
+- canonical Apache Iceberg table with daily hidden partitioning
+- idempotent Iceberg writes keyed by Kafka topic, partition, and offset
 - hourly event-time aggregates with a two-hour late-data watermark
 - unit normalization for particulate measurements
 - validation with a separate quarantine output and Kafka trace metadata
@@ -137,6 +140,12 @@ average, minimum, maximum, and latest measurement timestamp. Spark waits up to t
 hours of event time for late measurements. Older events remain in the canonical sink
 but no longer update a finalized aggregate window.
 
+Canonical measurements are written to both the existing Parquet transition sink
+and `local.lake.canonical_measurements` in the local Iceberg warehouse. The Iceberg
+sink uses its own checkpoint and replays retained Kafka data on its first run. Each
+micro-batch is merged by Kafka topic, partition, and offset, so records imported
+before the stream starts or replayed after a restart are not inserted twice.
+
 The aggregate checkpoint owns the window state. Changing the window duration,
 watermark delay, or grouping keys requires a deliberate new checkpoint and aggregate
 output path or a documented rebuild; do not delete or reuse the existing checkpoint
@@ -176,7 +185,8 @@ GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
 
 ## Roadmap
 
-- replace the Parquet sink with Apache Iceberg tables
+- migrate quarantine and hourly aggregates to Apache Iceberg
+- retire the transitional canonical Parquet sink after migration validation
 - enrich measurements with weather data
 - expose air-quality trends, anomalies, and data-freshness metrics
 - add operational monitoring and cloud deployment

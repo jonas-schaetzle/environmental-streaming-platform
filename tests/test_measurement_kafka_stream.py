@@ -1,9 +1,10 @@
 import json
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import MagicMock
 from uuid import uuid4
 
-from pyspark.sql import SparkSession
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import (
     BinaryType,
     DoubleType,
@@ -17,8 +18,48 @@ from pyspark.sql.types import (
 from src.measurement_model import filter_invalid_measurements
 from src.measurement_kafka_stream import (
     aggregate_measurements,
+    ensure_iceberg_tables,
+    merge_iceberg_measurement_batch,
     parse_kafka_measurements,
 )
+
+
+def test_ensure_iceberg_tables_creates_namespace_and_canonical_table() -> None:
+    spark = MagicMock(spec=SparkSession)
+
+    ensure_iceberg_tables(spark)
+
+    namespace_sql = spark.sql.call_args_list[0].args[0]
+    table_sql = spark.sql.call_args_list[1].args[0]
+
+    assert namespace_sql == "CREATE NAMESPACE IF NOT EXISTS local.lake"
+    assert "CREATE TABLE IF NOT EXISTS local.lake.canonical_measurements" in table_sql
+    assert "PARTITIONED BY (days(measured_at_utc))" in table_sql
+    assert "'format-version' = '2'" in table_sql
+
+
+def test_merge_iceberg_measurement_batch_inserts_only_unknown_kafka_offsets() -> None:
+    spark = MagicMock(spec=SparkSession)
+    merge_result = spark.sql.return_value
+    measurements = MagicMock(spec=DataFrame)
+    measurements.sparkSession = spark
+
+    merge_iceberg_measurement_batch(measurements, 7)
+
+    measurements.createOrReplaceTempView.assert_called_once_with(
+        "iceberg_canonical_measurement_batch"
+    )
+    merge_sql = spark.sql.call_args.args[0]
+    assert "MERGE INTO local.lake.canonical_measurements AS target" in merge_sql
+    assert "target.kafka_topic = incoming.kafka_topic" in merge_sql
+    assert "target.kafka_partition = incoming.kafka_partition" in merge_sql
+    assert "target.kafka_offset = incoming.kafka_offset" in merge_sql
+    assert "WHEN NOT MATCHED THEN INSERT" in merge_sql
+    assert "WHEN MATCHED" not in merge_sql
+    merge_result.collect.assert_called_once_with()
+    spark.catalog.dropTempView.assert_called_once_with(
+        "iceberg_canonical_measurement_batch"
+    )
 
 
 def test_parse_kafka_measurements_extracts_metadata_and_measurement(
