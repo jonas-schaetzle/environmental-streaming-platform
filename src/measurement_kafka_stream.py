@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 
 from pyspark.sql import DataFrame, SparkSession
@@ -42,12 +43,45 @@ LOCAL_SHUFFLE_PARTITIONS = "4"
 ICEBERG_CATALOG = "local"
 ICEBERG_NAMESPACE = f"{ICEBERG_CATALOG}.lake"
 ICEBERG_CANONICAL_TABLE = f"{ICEBERG_NAMESPACE}.canonical_measurements"
+ICEBERG_QUARANTINE_TABLE = f"{ICEBERG_NAMESPACE}.quarantine_measurements"
 ICEBERG_WAREHOUSE_PATH = str(
     Path(__file__).resolve().parent.parent / "data" / "warehouse"
 )
 ICEBERG_CANONICAL_BATCH_VIEW = "iceberg_canonical_measurement_batch"
 ICEBERG_CANONICAL_CHECKPOINT_PATH = (
     "data/checkpoints/iceberg_canonical_measurements"
+)
+ICEBERG_QUARANTINE_BATCH_VIEW = "iceberg_quarantine_measurement_batch"
+ICEBERG_QUARANTINE_CHECKPOINT_PATH = (
+    "data/checkpoints/iceberg_quarantine_measurements"
+)
+
+CANONICAL_MEASUREMENT_COLUMNS = (
+    "kafka_topic",
+    "kafka_partition",
+    "kafka_offset",
+    "kafka_timestamp",
+    "kafka_key",
+    "raw_value",
+    "source",
+    "location_id",
+    "sensor_id",
+    "parameter",
+    "parameter_display_name",
+    "value",
+    "unit",
+    "measured_at_utc",
+    "latitude",
+    "longitude",
+)
+QUARANTINE_MEASUREMENT_COLUMNS = (
+    *CANONICAL_MEASUREMENT_COLUMNS,
+    "validation_error",
+)
+KAFKA_IDENTITY_COLUMNS = (
+    "kafka_topic",
+    "kafka_partition",
+    "kafka_offset",
 )
 
 KAFKA_STREAM_OUTPUT_PATH = "data/lake/canonical_measurements"
@@ -112,6 +146,35 @@ def ensure_iceberg_tables(spark: SparkSession) -> None:
         )
         USING iceberg
         PARTITIONED BY (days(measured_at_utc))
+        TBLPROPERTIES (
+            'format-version' = '2',
+            'write.format.default' = 'parquet'
+        )
+        """
+    )
+    spark.sql(
+        f"""
+        CREATE TABLE IF NOT EXISTS {ICEBERG_QUARANTINE_TABLE} (
+            kafka_topic STRING,
+            kafka_partition INT,
+            kafka_offset BIGINT,
+            kafka_timestamp TIMESTAMP,
+            kafka_key STRING,
+            raw_value STRING,
+            source STRING,
+            location_id BIGINT,
+            sensor_id BIGINT,
+            parameter STRING,
+            parameter_display_name STRING,
+            value DOUBLE,
+            unit STRING,
+            measured_at_utc TIMESTAMP,
+            latitude DOUBLE,
+            longitude DOUBLE,
+            validation_error STRING
+        )
+        USING iceberg
+        PARTITIONED BY (days(kafka_timestamp))
         TBLPROPERTIES (
             'format-version' = '2',
             'write.format.default' = 'parquet'
@@ -203,69 +266,90 @@ def write_kafka_measurement_stream(measurements: DataFrame) -> StreamingQuery:
     )
 
 
-def merge_iceberg_measurement_batch(
+def _merge_iceberg_batch(
     measurements: DataFrame,
-    _batch_id: int,
+    target_table: str,
+    batch_view: str,
+    columns: tuple[str, ...],
 ) -> None:
     spark = measurements.sparkSession
-    measurements.createOrReplaceTempView(ICEBERG_CANONICAL_BATCH_VIEW)
+    merge_condition = "\n                AND ".join(
+        f"target.{column} = incoming.{column}" for column in KAFKA_IDENTITY_COLUMNS
+    )
+    insert_columns = ",\n                ".join(columns)
+    incoming_columns = ",\n                ".join(
+        f"incoming.{column}" for column in columns
+    )
+    measurements.createOrReplaceTempView(batch_view)
 
     try:
         spark.sql(
             f"""
-            MERGE INTO {ICEBERG_CANONICAL_TABLE} AS target
-            USING {ICEBERG_CANONICAL_BATCH_VIEW} AS incoming
-            ON target.kafka_topic = incoming.kafka_topic
-                AND target.kafka_partition = incoming.kafka_partition
-                AND target.kafka_offset = incoming.kafka_offset
+            MERGE INTO {target_table} AS target
+            USING {batch_view} AS incoming
+            ON {merge_condition}
             WHEN NOT MATCHED THEN INSERT (
-                kafka_topic,
-                kafka_partition,
-                kafka_offset,
-                kafka_timestamp,
-                kafka_key,
-                raw_value,
-                source,
-                location_id,
-                sensor_id,
-                parameter,
-                parameter_display_name,
-                value,
-                unit,
-                measured_at_utc,
-                latitude,
-                longitude
+                {insert_columns}
             ) VALUES (
-                incoming.kafka_topic,
-                incoming.kafka_partition,
-                incoming.kafka_offset,
-                incoming.kafka_timestamp,
-                incoming.kafka_key,
-                incoming.raw_value,
-                incoming.source,
-                incoming.location_id,
-                incoming.sensor_id,
-                incoming.parameter,
-                incoming.parameter_display_name,
-                incoming.value,
-                incoming.unit,
-                incoming.measured_at_utc,
-                incoming.latitude,
-                incoming.longitude
+                {incoming_columns}
             )
             """
         ).collect()
     finally:
-        spark.catalog.dropTempView(ICEBERG_CANONICAL_BATCH_VIEW)
+        spark.catalog.dropTempView(batch_view)
+
+
+def merge_iceberg_measurement_batch(
+    measurements: DataFrame,
+    _batch_id: int,
+) -> None:
+    _merge_iceberg_batch(
+        measurements,
+        ICEBERG_CANONICAL_TABLE,
+        ICEBERG_CANONICAL_BATCH_VIEW,
+        CANONICAL_MEASUREMENT_COLUMNS,
+    )
+
+
+def merge_iceberg_quarantine_batch(
+    measurements: DataFrame,
+    _batch_id: int,
+) -> None:
+    _merge_iceberg_batch(
+        measurements,
+        ICEBERG_QUARANTINE_TABLE,
+        ICEBERG_QUARANTINE_BATCH_VIEW,
+        QUARANTINE_MEASUREMENT_COLUMNS,
+    )
+
+
+def _write_iceberg_stream(
+    measurements: DataFrame,
+    merge_batch: Callable[[DataFrame, int], None],
+    checkpoint_path: str,
+) -> StreamingQuery:
+    return (
+        measurements.writeStream.foreachBatch(merge_batch)
+        .outputMode("append")
+        .option("checkpointLocation", checkpoint_path)
+        .trigger(availableNow=True)
+        .start()
+    )
 
 
 def write_iceberg_measurement_stream(measurements: DataFrame) -> StreamingQuery:
-    return (
-        measurements.writeStream.foreachBatch(merge_iceberg_measurement_batch)
-        .outputMode("append")
-        .option("checkpointLocation", ICEBERG_CANONICAL_CHECKPOINT_PATH)
-        .trigger(availableNow=True)
-        .start()
+    return _write_iceberg_stream(
+        measurements,
+        merge_iceberg_measurement_batch,
+        ICEBERG_CANONICAL_CHECKPOINT_PATH,
+    )
+
+
+def write_iceberg_quarantine_stream(measurements: DataFrame) -> StreamingQuery:
+    return _write_iceberg_stream(
+        measurements,
+        merge_iceberg_quarantine_batch,
+        ICEBERG_QUARANTINE_CHECKPOINT_PATH,
     )
 
 
@@ -304,11 +388,13 @@ def main() -> None:
     valid_query = write_kafka_measurement_stream(valid_measurements)
     iceberg_query = write_iceberg_measurement_stream(valid_measurements)
     invalid_query = write_invalid_kafka_measurement_stream(invalid_measurements)
+    iceberg_quarantine_query = write_iceberg_quarantine_stream(invalid_measurements)
     aggregate_query = write_hourly_aggregate_stream(hourly_aggregates)
 
     valid_query.awaitTermination()
     iceberg_query.awaitTermination()
     invalid_query.awaitTermination()
+    iceberg_quarantine_query.awaitTermination()
     aggregate_query.awaitTermination()
 
     spark.stop()

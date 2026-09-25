@@ -20,6 +20,7 @@ from src.measurement_kafka_stream import (
     aggregate_measurements,
     ensure_iceberg_tables,
     merge_iceberg_measurement_batch,
+    merge_iceberg_quarantine_batch,
     parse_kafka_measurements,
 )
 
@@ -31,11 +32,18 @@ def test_ensure_iceberg_tables_creates_namespace_and_canonical_table() -> None:
 
     namespace_sql = spark.sql.call_args_list[0].args[0]
     table_sql = spark.sql.call_args_list[1].args[0]
+    quarantine_table_sql = spark.sql.call_args_list[2].args[0]
 
     assert namespace_sql == "CREATE NAMESPACE IF NOT EXISTS local.lake"
     assert "CREATE TABLE IF NOT EXISTS local.lake.canonical_measurements" in table_sql
     assert "PARTITIONED BY (days(measured_at_utc))" in table_sql
     assert "'format-version' = '2'" in table_sql
+    assert (
+        "CREATE TABLE IF NOT EXISTS local.lake.quarantine_measurements"
+        in quarantine_table_sql
+    )
+    assert "validation_error STRING" in quarantine_table_sql
+    assert "PARTITIONED BY (days(kafka_timestamp))" in quarantine_table_sql
 
 
 def test_merge_iceberg_measurement_batch_inserts_only_unknown_kafka_offsets() -> None:
@@ -59,6 +67,30 @@ def test_merge_iceberg_measurement_batch_inserts_only_unknown_kafka_offsets() ->
     merge_result.collect.assert_called_once_with()
     spark.catalog.dropTempView.assert_called_once_with(
         "iceberg_canonical_measurement_batch"
+    )
+
+
+def test_merge_iceberg_quarantine_batch_preserves_validation_error() -> None:
+    spark = MagicMock(spec=SparkSession)
+    merge_result = spark.sql.return_value
+    measurements = MagicMock(spec=DataFrame)
+    measurements.sparkSession = spark
+
+    merge_iceberg_quarantine_batch(measurements, 8)
+
+    measurements.createOrReplaceTempView.assert_called_once_with(
+        "iceberg_quarantine_measurement_batch"
+    )
+    merge_sql = spark.sql.call_args.args[0]
+    assert "MERGE INTO local.lake.quarantine_measurements AS target" in merge_sql
+    assert "target.kafka_topic = incoming.kafka_topic" in merge_sql
+    assert "target.kafka_partition = incoming.kafka_partition" in merge_sql
+    assert "target.kafka_offset = incoming.kafka_offset" in merge_sql
+    assert "validation_error" in merge_sql
+    assert "incoming.validation_error" in merge_sql
+    merge_result.collect.assert_called_once_with()
+    spark.catalog.dropTempView.assert_called_once_with(
+        "iceberg_quarantine_measurement_batch"
     )
 
 

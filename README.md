@@ -26,10 +26,11 @@ environment.measurements.canonical
     |
     v
 Spark Structured Streaming
-    |-- valid events ------> data/lake/canonical_measurements (Parquet transition)
-    |                  `---> local.lake.canonical_measurements (Iceberg)
+    |-- valid events --+--> data/lake/canonical_measurements (Parquet transition)
+    |                  `--> local.lake.canonical_measurements (Iceberg)
     |-- hourly aggregates -> data/lake/hourly_measurement_aggregates
-    `-- invalid events ----> data/lake/quarantine_measurements
+    `-- invalid events +--> data/lake/quarantine_measurements (Parquet transition)
+                       `--> local.lake.quarantine_measurements (Iceberg)
 ```
 
 Kafka offsets and Spark checkpoints make the processing restartable. OpenAQ
@@ -47,7 +48,7 @@ timestamp per sensor to avoid publishing unchanged API results repeatedly.
 - cached sensor metadata during continuous polling
 - Kafka delivery verification and sensor-based partition keys
 - Spark Structured Streaming with checkpointed Kafka offsets
-- canonical Apache Iceberg table with daily hidden partitioning
+- canonical and quarantine Apache Iceberg tables with daily hidden partitioning
 - idempotent Iceberg writes keyed by Kafka topic, partition, and offset
 - hourly event-time aggregates with a two-hour late-data watermark
 - unit normalization for particulate measurements
@@ -145,6 +146,9 @@ and `local.lake.canonical_measurements` in the local Iceberg warehouse. The Iceb
 sink uses its own checkpoint and replays retained Kafka data on its first run. Each
 micro-batch is merged by Kafka topic, partition, and offset, so records imported
 before the stream starts or replayed after a restart are not inserted twice.
+Invalid records follow the same replay-safe merge strategy in
+`local.lake.quarantine_measurements`. Their hidden daily partition uses the Kafka
+timestamp because malformed payloads may not contain a usable measurement timestamp.
 
 The aggregate checkpoint owns the window state. Changing the window duration,
 watermark delay, or grouping keys requires a deliberate new checkpoint and aggregate
@@ -185,8 +189,8 @@ GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
 
 ## Roadmap
 
-- migrate quarantine and hourly aggregates to Apache Iceberg
-- retire the transitional canonical Parquet sink after migration validation
+- migrate hourly aggregates to Apache Iceberg
+- retire the transitional Parquet sinks after migration validation
 - enrich measurements with weather data
 - expose air-quality trends, anomalies, and data-freshness metrics
 - add operational monitoring and cloud deployment
