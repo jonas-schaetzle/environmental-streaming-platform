@@ -163,6 +163,16 @@ Inspect Kafka events without committing consumer offsets:
 python src/kafka_measurement_consumer.py
 ```
 
+Audit all Iceberg tables after a pipeline run or backfill:
+
+```bash
+python src/iceberg_table_audit.py
+```
+
+The JSON report includes row and data-file counts, duplicate or incomplete identity
+keys, hidden partitioning, freshness timestamps, and snapshot metadata. The command
+returns a non-zero exit code when any table fails its identity or partition checks.
+
 All runtime state, checkpoints, and measurement outputs live under `data/` and are
 excluded from version control. Legacy Parquet outputs and checkpoints may remain
 there after the Iceberg cutover, but the pipeline no longer updates or deletes them.
@@ -192,7 +202,6 @@ GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
 
 ## Roadmap
 
-- add automated Iceberg backfill and table-health validation
 - add Iceberg snapshot expiration and small-file compaction
 - enrich measurements with weather data
 - expose air-quality trends, anomalies, and data-freshness metrics
