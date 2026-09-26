@@ -20,6 +20,8 @@
   and quarantine reasons.
 - `src/measurement_kafka_stream.py` owns Spark stream orchestration, checkpoints,
   and valid, quarantine, and hourly aggregate sinks.
+- `src/iceberg_table_audit.py` owns read-only Iceberg table-health and backfill
+  validation.
 - `src/kafka_measurement_consumer.py` is a diagnostic reader and must not commit
   consumer offsets.
 - `src/spark_runtime.py` owns local Spark and Java runtime discovery.

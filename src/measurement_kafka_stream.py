@@ -119,14 +119,6 @@ HOURLY_AGGREGATE_UPDATE_COLUMNS = (
     "latest_measured_at_utc",
 )
 
-KAFKA_STREAM_OUTPUT_PATH = "data/lake/canonical_measurements"
-KAFKA_STREAM_CHECKPOINT_PATH = "data/checkpoints/canonical_measurements"
-KAFKA_INVALID_STREAM_OUTPUT_PATH = "data/lake/quarantine_measurements"
-KAFKA_INVALID_STREAM_CHECKPOINT_PATH = "data/checkpoints/quarantine_measurements"
-
-HOURLY_AGGREGATE_OUTPUT_PATH = "data/lake/hourly_measurement_aggregates"
-HOURLY_AGGREGATE_CHECKPOINT_PATH = "data/checkpoints/hourly_measurement_aggregates"
-
 MEASUREMENT_WINDOW_DURATION = "1 hour"
 MEASUREMENT_WATERMARK_DELAY = "2 hours"
 
@@ -314,16 +306,6 @@ def aggregate_measurements(
     )
 
 
-def write_kafka_measurement_stream(measurements: DataFrame) -> StreamingQuery:
-    return (
-        measurements.writeStream.format("parquet")
-        .outputMode("append")
-        .option("checkpointLocation", KAFKA_STREAM_CHECKPOINT_PATH)
-        .trigger(availableNow=True)
-        .start(KAFKA_STREAM_OUTPUT_PATH)
-    )
-
-
 def _merge_iceberg_batch(
     measurements: DataFrame,
     target_table: str,
@@ -451,26 +433,6 @@ def write_iceberg_hourly_aggregate_stream(
     )
 
 
-def write_invalid_kafka_measurement_stream(measurements: DataFrame) -> StreamingQuery:
-    return (
-        measurements.writeStream.format("parquet")
-        .outputMode("append")
-        .option("checkpointLocation", KAFKA_INVALID_STREAM_CHECKPOINT_PATH)
-        .trigger(availableNow=True)
-        .start(KAFKA_INVALID_STREAM_OUTPUT_PATH)
-    )
-
-
-def write_hourly_aggregate_stream(aggregates: DataFrame) -> StreamingQuery:
-    return (
-        aggregates.writeStream.format("parquet")
-        .outputMode("append")
-        .option("checkpointLocation", HOURLY_AGGREGATE_CHECKPOINT_PATH)
-        .trigger(availableNow=True)
-        .start(HOURLY_AGGREGATE_OUTPUT_PATH)
-    )
-
-
 def main() -> None:
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
@@ -483,19 +445,13 @@ def main() -> None:
     invalid_measurements = filter_invalid_measurements(parsed_measurements)
     hourly_aggregates = aggregate_measurements(valid_measurements)
 
-    valid_query = write_kafka_measurement_stream(valid_measurements)
-    iceberg_query = write_iceberg_measurement_stream(valid_measurements)
-    invalid_query = write_invalid_kafka_measurement_stream(invalid_measurements)
-    iceberg_quarantine_query = write_iceberg_quarantine_stream(invalid_measurements)
-    aggregate_query = write_hourly_aggregate_stream(hourly_aggregates)
-    iceberg_aggregate_query = write_iceberg_hourly_aggregate_stream(hourly_aggregates)
+    canonical_query = write_iceberg_measurement_stream(valid_measurements)
+    quarantine_query = write_iceberg_quarantine_stream(invalid_measurements)
+    aggregate_query = write_iceberg_hourly_aggregate_stream(hourly_aggregates)
 
-    valid_query.awaitTermination()
-    iceberg_query.awaitTermination()
-    invalid_query.awaitTermination()
-    iceberg_quarantine_query.awaitTermination()
+    canonical_query.awaitTermination()
+    quarantine_query.awaitTermination()
     aggregate_query.awaitTermination()
-    iceberg_aggregate_query.awaitTermination()
 
     spark.stop()
 
