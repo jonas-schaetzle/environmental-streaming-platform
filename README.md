@@ -26,9 +26,12 @@ environment.measurements.canonical
     |
     v
 Spark Structured Streaming
-    |-- valid events ------> data/lake/canonical_measurements
-    |-- hourly aggregates -> data/lake/hourly_measurement_aggregates
-    `-- invalid events ----> data/lake/quarantine_measurements
+    |-- valid events --+--> data/lake/canonical_measurements (Parquet transition)
+    |                  `--> local.lake.canonical_measurements (Iceberg)
+    |-- hourly aggregates +--> data/lake/hourly_measurement_aggregates (Parquet transition)
+    |                       `--> local.lake.hourly_measurement_aggregates (Iceberg)
+    `-- invalid events +--> data/lake/quarantine_measurements (Parquet transition)
+                       `--> local.lake.quarantine_measurements (Iceberg)
 ```
 
 Kafka offsets and Spark checkpoints make the processing restartable. OpenAQ
@@ -46,6 +49,9 @@ timestamp per sensor to avoid publishing unchanged API results repeatedly.
 - cached sensor metadata during continuous polling
 - Kafka delivery verification and sensor-based partition keys
 - Spark Structured Streaming with checkpointed Kafka offsets
+- canonical, quarantine, and hourly aggregate Apache Iceberg tables
+- idempotent Iceberg event writes keyed by Kafka topic, partition, and offset
+- replay-safe aggregate upserts keyed by window and measurement dimensions
 - hourly event-time aggregates with a two-hour late-data watermark
 - unit normalization for particulate measurements
 - validation with a separate quarantine output and Kafka trace metadata
@@ -71,7 +77,7 @@ source .env
 set +a
 ```
 
-Spark 4.2.0 requires Java 17, 21, or 25. The project auto-detects common Java
+Spark 4.1.1 requires Java 17 or 21. The project auto-detects common Java
 installations, including Homebrew JDK paths on macOS. Java 21 can be installed with:
 
 ```bash
@@ -137,10 +143,23 @@ average, minimum, maximum, and latest measurement timestamp. Spark waits up to t
 hours of event time for late measurements. Older events remain in the canonical sink
 but no longer update a finalized aggregate window.
 
+Canonical measurements are written to both the existing Parquet transition sink
+and `local.lake.canonical_measurements` in the local Iceberg warehouse. The Iceberg
+sink uses its own checkpoint and replays retained Kafka data on its first run. Each
+micro-batch is merged by Kafka topic, partition, and offset, so records imported
+before the stream starts or replayed after a restart are not inserted twice.
+Invalid records follow the same replay-safe merge strategy in
+`local.lake.quarantine_measurements`. Their hidden daily partition uses the Kafka
+timestamp because malformed payloads may not contain a usable measurement timestamp.
+Finalized hourly windows are merged into
+`local.lake.hourly_measurement_aggregates` using their window, source, location,
+parameter, and unit as the business key. A replay inserts new windows and updates
+existing windows with recalculated metrics instead of creating duplicates.
+
 The aggregate checkpoint owns the window state. Changing the window duration,
-watermark delay, or grouping keys requires a deliberate new checkpoint and aggregate
-output path or a documented rebuild; do not delete or reuse the existing checkpoint
-implicitly.
+watermark delay, or grouping keys requires a deliberate new checkpoint and a
+documented rebuild or migration of both aggregate sinks; do not delete or reuse the
+existing checkpoints implicitly.
 
 Inspect Kafka events without committing consumer offsets:
 
@@ -176,7 +195,8 @@ GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
 
 ## Roadmap
 
-- replace the Parquet sink with Apache Iceberg tables
+- validate Iceberg backfills and retire the transitional Parquet sinks
+- add Iceberg snapshot expiration and small-file compaction
 - enrich measurements with weather data
 - expose air-quality trends, anomalies, and data-freshness metrics
 - add operational monitoring and cloud deployment

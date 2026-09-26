@@ -69,5 +69,5 @@ def test_configure_java_runtime_raises_clear_error_when_java_is_missing(
     monkeypatch.setattr(spark_runtime, "_macos_java_home", lambda _: None)
     monkeypatch.setattr(spark_runtime, "HOMEBREW_JDK_HOMES", ())
 
-    with pytest.raises(RuntimeError, match="Spark 4.2 requires Java"):
+    with pytest.raises(RuntimeError, match="Spark 4.1 requires Java"):
         spark_runtime.configure_java_runtime()

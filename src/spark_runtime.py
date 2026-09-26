@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 
-SUPPORTED_JAVA_VERSIONS = ("21", "17", "25")
+SUPPORTED_JAVA_VERSIONS = ("21", "17")
 HOMEBREW_JDK_HOMES = (
     Path("/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"),
     Path("/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"),
@@ -35,7 +35,7 @@ def configure_java_runtime() -> str | None:
         return str(discovered_java_home)
 
     raise RuntimeError(
-        "No supported Java runtime found. Spark 4.2 requires Java 17, 21, or 25. "
+        "No supported Java runtime found. Spark 4.1 requires Java 17 or 21. "
         "Install one with `brew install openjdk@21` on macOS, or set JAVA_HOME "
         "to an existing JDK installation."
     )
