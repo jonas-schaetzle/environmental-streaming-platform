@@ -19,13 +19,14 @@ from src.measurement_model import filter_invalid_measurements
 from src.measurement_kafka_stream import (
     aggregate_measurements,
     ensure_iceberg_tables,
+    merge_iceberg_hourly_aggregate_batch,
     merge_iceberg_measurement_batch,
     merge_iceberg_quarantine_batch,
     parse_kafka_measurements,
 )
 
 
-def test_ensure_iceberg_tables_creates_namespace_and_canonical_table() -> None:
+def test_ensure_iceberg_tables_creates_expected_tables() -> None:
     spark = MagicMock(spec=SparkSession)
 
     ensure_iceberg_tables(spark)
@@ -33,6 +34,7 @@ def test_ensure_iceberg_tables_creates_namespace_and_canonical_table() -> None:
     namespace_sql = spark.sql.call_args_list[0].args[0]
     table_sql = spark.sql.call_args_list[1].args[0]
     quarantine_table_sql = spark.sql.call_args_list[2].args[0]
+    aggregate_table_sql = spark.sql.call_args_list[3].args[0]
 
     assert namespace_sql == "CREATE NAMESPACE IF NOT EXISTS local.lake"
     assert "CREATE TABLE IF NOT EXISTS local.lake.canonical_measurements" in table_sql
@@ -44,6 +46,12 @@ def test_ensure_iceberg_tables_creates_namespace_and_canonical_table() -> None:
     )
     assert "validation_error STRING" in quarantine_table_sql
     assert "PARTITIONED BY (days(kafka_timestamp))" in quarantine_table_sql
+    assert (
+        "CREATE TABLE IF NOT EXISTS local.lake.hourly_measurement_aggregates"
+        in aggregate_table_sql
+    )
+    assert "measurement_count BIGINT" in aggregate_table_sql
+    assert "PARTITIONED BY (days(window_start))" in aggregate_table_sql
 
 
 def test_merge_iceberg_measurement_batch_inserts_only_unknown_kafka_offsets() -> None:
@@ -91,6 +99,35 @@ def test_merge_iceberg_quarantine_batch_preserves_validation_error() -> None:
     merge_result.collect.assert_called_once_with()
     spark.catalog.dropTempView.assert_called_once_with(
         "iceberg_quarantine_measurement_batch"
+    )
+
+
+def test_merge_iceberg_hourly_aggregate_batch_updates_existing_window() -> None:
+    spark = MagicMock(spec=SparkSession)
+    merge_result = spark.sql.return_value
+    aggregates = MagicMock(spec=DataFrame)
+    aggregates.sparkSession = spark
+
+    merge_iceberg_hourly_aggregate_batch(aggregates, 9)
+
+    aggregates.createOrReplaceTempView.assert_called_once_with(
+        "iceberg_hourly_measurement_aggregate_batch"
+    )
+    merge_sql = spark.sql.call_args.args[0]
+    assert "MERGE INTO local.lake.hourly_measurement_aggregates AS target" in merge_sql
+    assert "target.window_start = incoming.window_start" in merge_sql
+    assert "target.window_end = incoming.window_end" in merge_sql
+    assert "target.source = incoming.source" in merge_sql
+    assert "target.location_id = incoming.location_id" in merge_sql
+    assert "target.parameter = incoming.parameter" in merge_sql
+    assert "target.unit = incoming.unit" in merge_sql
+    assert "WHEN MATCHED THEN UPDATE SET" in merge_sql
+    assert "target.measurement_count = incoming.measurement_count" in merge_sql
+    assert "target.average_value = incoming.average_value" in merge_sql
+    assert "WHEN NOT MATCHED THEN INSERT" in merge_sql
+    merge_result.collect.assert_called_once_with()
+    spark.catalog.dropTempView.assert_called_once_with(
+        "iceberg_hourly_measurement_aggregate_batch"
     )
 
 

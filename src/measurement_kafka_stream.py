@@ -44,6 +44,9 @@ ICEBERG_CATALOG = "local"
 ICEBERG_NAMESPACE = f"{ICEBERG_CATALOG}.lake"
 ICEBERG_CANONICAL_TABLE = f"{ICEBERG_NAMESPACE}.canonical_measurements"
 ICEBERG_QUARANTINE_TABLE = f"{ICEBERG_NAMESPACE}.quarantine_measurements"
+ICEBERG_HOURLY_AGGREGATE_TABLE = (
+    f"{ICEBERG_NAMESPACE}.hourly_measurement_aggregates"
+)
 ICEBERG_WAREHOUSE_PATH = str(
     Path(__file__).resolve().parent.parent / "data" / "warehouse"
 )
@@ -54,6 +57,10 @@ ICEBERG_CANONICAL_CHECKPOINT_PATH = (
 ICEBERG_QUARANTINE_BATCH_VIEW = "iceberg_quarantine_measurement_batch"
 ICEBERG_QUARANTINE_CHECKPOINT_PATH = (
     "data/checkpoints/iceberg_quarantine_measurements"
+)
+ICEBERG_HOURLY_AGGREGATE_BATCH_VIEW = "iceberg_hourly_measurement_aggregate_batch"
+ICEBERG_HOURLY_AGGREGATE_CHECKPOINT_PATH = (
+    "data/checkpoints/iceberg_hourly_measurement_aggregates"
 )
 
 CANONICAL_MEASUREMENT_COLUMNS = (
@@ -82,6 +89,34 @@ KAFKA_IDENTITY_COLUMNS = (
     "kafka_topic",
     "kafka_partition",
     "kafka_offset",
+)
+HOURLY_AGGREGATE_COLUMNS = (
+    "window_start",
+    "window_end",
+    "source",
+    "location_id",
+    "parameter",
+    "unit",
+    "measurement_count",
+    "average_value",
+    "minimum_value",
+    "maximum_value",
+    "latest_measured_at_utc",
+)
+HOURLY_AGGREGATE_IDENTITY_COLUMNS = (
+    "window_start",
+    "window_end",
+    "source",
+    "location_id",
+    "parameter",
+    "unit",
+)
+HOURLY_AGGREGATE_UPDATE_COLUMNS = (
+    "measurement_count",
+    "average_value",
+    "minimum_value",
+    "maximum_value",
+    "latest_measured_at_utc",
 )
 
 KAFKA_STREAM_OUTPUT_PATH = "data/lake/canonical_measurements"
@@ -181,6 +216,29 @@ def ensure_iceberg_tables(spark: SparkSession) -> None:
         )
         """
     )
+    spark.sql(
+        f"""
+        CREATE TABLE IF NOT EXISTS {ICEBERG_HOURLY_AGGREGATE_TABLE} (
+            window_start TIMESTAMP,
+            window_end TIMESTAMP,
+            source STRING,
+            location_id BIGINT,
+            parameter STRING,
+            unit STRING,
+            measurement_count BIGINT,
+            average_value DOUBLE,
+            minimum_value DOUBLE,
+            maximum_value DOUBLE,
+            latest_measured_at_utc TIMESTAMP
+        )
+        USING iceberg
+        PARTITIONED BY (days(window_start))
+        TBLPROPERTIES (
+            'format-version' = '2',
+            'write.format.default' = 'parquet'
+        )
+        """
+    )
 
 
 def read_kafka_stream(spark: SparkSession) -> DataFrame:
@@ -271,14 +329,27 @@ def _merge_iceberg_batch(
     target_table: str,
     batch_view: str,
     columns: tuple[str, ...],
+    identity_columns: tuple[str, ...],
+    update_columns: tuple[str, ...] = (),
 ) -> None:
     spark = measurements.sparkSession
     merge_condition = "\n                AND ".join(
-        f"target.{column} = incoming.{column}" for column in KAFKA_IDENTITY_COLUMNS
+        f"target.{column} = incoming.{column}" for column in identity_columns
     )
     insert_columns = ",\n                ".join(columns)
     incoming_columns = ",\n                ".join(
         f"incoming.{column}" for column in columns
+    )
+    update_assignments = ",\n                ".join(
+        f"target.{column} = incoming.{column}" for column in update_columns
+    )
+    update_clause = (
+        f"""
+            WHEN MATCHED THEN UPDATE SET
+                {update_assignments}
+        """
+        if update_columns
+        else ""
     )
     measurements.createOrReplaceTempView(batch_view)
 
@@ -288,6 +359,7 @@ def _merge_iceberg_batch(
             MERGE INTO {target_table} AS target
             USING {batch_view} AS incoming
             ON {merge_condition}
+            {update_clause}
             WHEN NOT MATCHED THEN INSERT (
                 {insert_columns}
             ) VALUES (
@@ -308,6 +380,7 @@ def merge_iceberg_measurement_batch(
         ICEBERG_CANONICAL_TABLE,
         ICEBERG_CANONICAL_BATCH_VIEW,
         CANONICAL_MEASUREMENT_COLUMNS,
+        KAFKA_IDENTITY_COLUMNS,
     )
 
 
@@ -320,6 +393,21 @@ def merge_iceberg_quarantine_batch(
         ICEBERG_QUARANTINE_TABLE,
         ICEBERG_QUARANTINE_BATCH_VIEW,
         QUARANTINE_MEASUREMENT_COLUMNS,
+        KAFKA_IDENTITY_COLUMNS,
+    )
+
+
+def merge_iceberg_hourly_aggregate_batch(
+    aggregates: DataFrame,
+    _batch_id: int,
+) -> None:
+    _merge_iceberg_batch(
+        aggregates,
+        ICEBERG_HOURLY_AGGREGATE_TABLE,
+        ICEBERG_HOURLY_AGGREGATE_BATCH_VIEW,
+        HOURLY_AGGREGATE_COLUMNS,
+        HOURLY_AGGREGATE_IDENTITY_COLUMNS,
+        HOURLY_AGGREGATE_UPDATE_COLUMNS,
     )
 
 
@@ -350,6 +438,16 @@ def write_iceberg_quarantine_stream(measurements: DataFrame) -> StreamingQuery:
         measurements,
         merge_iceberg_quarantine_batch,
         ICEBERG_QUARANTINE_CHECKPOINT_PATH,
+    )
+
+
+def write_iceberg_hourly_aggregate_stream(
+    aggregates: DataFrame,
+) -> StreamingQuery:
+    return _write_iceberg_stream(
+        aggregates,
+        merge_iceberg_hourly_aggregate_batch,
+        ICEBERG_HOURLY_AGGREGATE_CHECKPOINT_PATH,
     )
 
 
@@ -390,12 +488,14 @@ def main() -> None:
     invalid_query = write_invalid_kafka_measurement_stream(invalid_measurements)
     iceberg_quarantine_query = write_iceberg_quarantine_stream(invalid_measurements)
     aggregate_query = write_hourly_aggregate_stream(hourly_aggregates)
+    iceberg_aggregate_query = write_iceberg_hourly_aggregate_stream(hourly_aggregates)
 
     valid_query.awaitTermination()
     iceberg_query.awaitTermination()
     invalid_query.awaitTermination()
     iceberg_quarantine_query.awaitTermination()
     aggregate_query.awaitTermination()
+    iceberg_aggregate_query.awaitTermination()
 
     spark.stop()
 

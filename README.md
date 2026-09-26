@@ -28,7 +28,8 @@ environment.measurements.canonical
 Spark Structured Streaming
     |-- valid events --+--> data/lake/canonical_measurements (Parquet transition)
     |                  `--> local.lake.canonical_measurements (Iceberg)
-    |-- hourly aggregates -> data/lake/hourly_measurement_aggregates
+    |-- hourly aggregates +--> data/lake/hourly_measurement_aggregates (Parquet transition)
+    |                       `--> local.lake.hourly_measurement_aggregates (Iceberg)
     `-- invalid events +--> data/lake/quarantine_measurements (Parquet transition)
                        `--> local.lake.quarantine_measurements (Iceberg)
 ```
@@ -48,8 +49,9 @@ timestamp per sensor to avoid publishing unchanged API results repeatedly.
 - cached sensor metadata during continuous polling
 - Kafka delivery verification and sensor-based partition keys
 - Spark Structured Streaming with checkpointed Kafka offsets
-- canonical and quarantine Apache Iceberg tables with daily hidden partitioning
-- idempotent Iceberg writes keyed by Kafka topic, partition, and offset
+- canonical, quarantine, and hourly aggregate Apache Iceberg tables
+- idempotent Iceberg event writes keyed by Kafka topic, partition, and offset
+- replay-safe aggregate upserts keyed by window and measurement dimensions
 - hourly event-time aggregates with a two-hour late-data watermark
 - unit normalization for particulate measurements
 - validation with a separate quarantine output and Kafka trace metadata
@@ -149,11 +151,15 @@ before the stream starts or replayed after a restart are not inserted twice.
 Invalid records follow the same replay-safe merge strategy in
 `local.lake.quarantine_measurements`. Their hidden daily partition uses the Kafka
 timestamp because malformed payloads may not contain a usable measurement timestamp.
+Finalized hourly windows are merged into
+`local.lake.hourly_measurement_aggregates` using their window, source, location,
+parameter, and unit as the business key. A replay inserts new windows and updates
+existing windows with recalculated metrics instead of creating duplicates.
 
 The aggregate checkpoint owns the window state. Changing the window duration,
-watermark delay, or grouping keys requires a deliberate new checkpoint and aggregate
-output path or a documented rebuild; do not delete or reuse the existing checkpoint
-implicitly.
+watermark delay, or grouping keys requires a deliberate new checkpoint and a
+documented rebuild or migration of both aggregate sinks; do not delete or reuse the
+existing checkpoints implicitly.
 
 Inspect Kafka events without committing consumer offsets:
 
@@ -189,8 +195,8 @@ GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
 
 ## Roadmap
 
-- migrate hourly aggregates to Apache Iceberg
-- retire the transitional Parquet sinks after migration validation
+- validate Iceberg backfills and retire the transitional Parquet sinks
+- add Iceberg snapshot expiration and small-file compaction
 - enrich measurements with weather data
 - expose air-quality trends, anomalies, and data-freshness metrics
 - add operational monitoring and cloud deployment
