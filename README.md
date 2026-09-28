@@ -49,6 +49,8 @@ timestamp per sensor to avoid publishing unchanged API results repeatedly.
 - canonical, quarantine, and hourly aggregate Apache Iceberg tables
 - idempotent Iceberg event writes keyed by Kafka topic, partition, and offset
 - replay-safe aggregate upserts keyed by window and measurement dimensions
+- read-only Iceberg maintenance reporting with explicit compaction and snapshot
+  expiration actions
 - hourly event-time aggregates with a two-hour late-data watermark
 - location-level JSON insights with latest values, finalized hourly statistics, and
   configurable data-freshness status
@@ -175,6 +177,33 @@ The JSON report includes row and data-file counts, duplicate or incomplete ident
 keys, hidden partitioning, freshness timestamps, and snapshot metadata. The command
 returns a non-zero exit code when any table fails its identity or partition checks.
 
+Inspect small-file and snapshot maintenance needs without changing the tables:
+
+```bash
+python src/iceberg_table_maintenance.py
+```
+
+The report evaluates small-file and file-count compaction triggers within each hidden
+partition and shows how many old snapshots are eligible under the configured
+retention policy. Maintenance only runs when explicitly requested. Compact all known
+tables with Iceberg bin-packing:
+
+```bash
+python src/iceberg_table_maintenance.py --compact
+```
+
+Expire snapshots older than seven days while always retaining the five most recent
+snapshots per table:
+
+```bash
+python src/iceberg_table_maintenance.py --expire-snapshots
+```
+
+Use `--table canonical`, `--table quarantine`, or `--table hourly` to restrict an
+operation. Compaction preserves logical rows but creates a new snapshot. Snapshot
+expiration removes old time-travel history and unreferenced files; it does not alter
+Kafka offsets or Spark checkpoints.
+
 Generate a current report for every curated location from the Iceberg tables:
 
 ```bash
@@ -224,7 +253,6 @@ GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
 
 ## Roadmap
 
-- add Iceberg snapshot expiration and small-file compaction
 - enrich measurements with weather data
 - expose air-quality anomalies and longer-term trends
 - add operational monitoring and cloud deployment
