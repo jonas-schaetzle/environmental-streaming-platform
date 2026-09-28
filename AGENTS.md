@@ -22,6 +22,8 @@
   and valid, quarantine, and hourly aggregate sinks.
 - `src/iceberg_table_audit.py` owns read-only Iceberg table-health and backfill
   validation.
+- `src/air_quality_insights.py` owns read-only location freshness and latest-trend
+  product generation from Iceberg.
 - `src/kafka_measurement_consumer.py` is a diagnostic reader and must not commit
   consumer offsets.
 - `src/spark_runtime.py` owns local Spark and Java runtime discovery.
