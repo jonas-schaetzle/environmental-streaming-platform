@@ -50,6 +50,8 @@ timestamp per sensor to avoid publishing unchanged API results repeatedly.
 - idempotent Iceberg event writes keyed by Kafka topic, partition, and offset
 - replay-safe aggregate upserts keyed by window and measurement dimensions
 - hourly event-time aggregates with a two-hour late-data watermark
+- location-level JSON insights with latest values, finalized hourly statistics, and
+  configurable data-freshness status
 - unit normalization for particulate measurements
 - validation with a separate quarantine output and Kafka trace metadata
 - local Kafka runtime through Docker Compose
@@ -173,6 +175,26 @@ The JSON report includes row and data-file counts, duplicate or incomplete ident
 keys, hidden partitioning, freshness timestamps, and snapshot metadata. The command
 returns a non-zero exit code when any table fails its identity or partition checks.
 
+Generate a current report for every curated location from the Iceberg tables:
+
+```bash
+python src/air_quality_insights.py
+```
+
+The report contains the latest value per parameter, its measurement age, and the
+latest finalized hourly average, minimum, maximum, and count. Configured locations
+without measurements remain visible with the status `missing`. Measurements are
+`fresh` for up to two hours by default and `stale` afterwards. Override that
+operational freshness threshold when needed:
+
+```bash
+python src/air_quality_insights.py \
+  --freshness-threshold-minutes 60
+```
+
+These statuses describe data availability, not health risk or regulatory air-quality
+classification.
+
 All runtime state, checkpoints, and measurement outputs live under `data/` and are
 excluded from version control. Legacy Parquet outputs and checkpoints may remain
 there after the Iceberg cutover, but the pipeline no longer updates or deletes them.
@@ -204,5 +226,5 @@ GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
 
 - add Iceberg snapshot expiration and small-file compaction
 - enrich measurements with weather data
-- expose air-quality trends, anomalies, and data-freshness metrics
+- expose air-quality anomalies and longer-term trends
 - add operational monitoring and cloud deployment
