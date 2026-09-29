@@ -35,6 +35,23 @@ Kafka offsets and Spark checkpoints make the processing restartable. OpenAQ
 measurements are keyed by sensor ID, and the producer persists the latest published
 timestamp per sensor to avoid publishing unchanged API results repeatedly.
 
+## Package Structure
+
+```text
+src/environmental_streaming/
+    ingestion/    # external source clients and producers
+    messaging/    # Kafka publishing adapters
+    processing/   # canonical models and Spark streaming pipelines
+    lakehouse/    # Iceberg table definitions, audit, and maintenance
+    products/     # read-only analytical products
+    diagnostics/  # operational inspection tools
+    runtime/      # Spark and Java runtime configuration
+```
+
+Run command-line modules with `python -m environmental_streaming...` after the
+editable installation described below. This keeps imports package-safe while source
+changes remain immediately available in the virtual environment.
+
 ## Current Capabilities
 
 - direct ingestion from the OpenAQ API for one or more locations
@@ -66,6 +83,7 @@ Create and activate a Python virtual environment, then install the dependencies:
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+python -m pip install --no-deps -e .
 ```
 
 Create the local environment file, add an OpenAQ API key, and load it into the
@@ -109,13 +127,13 @@ Run one ingestion cycle for the curated locations in
 `config/openaq_locations.json`:
 
 ```bash
-python src/openaq_kafka_producer.py
+python -m environmental_streaming.ingestion.openaq_producer
 ```
 
 Poll the configured locations continuously:
 
 ```bash
-python src/openaq_kafka_producer.py \
+python -m environmental_streaming.ingestion.openaq_producer \
   --poll-interval-seconds 300
 ```
 
@@ -127,7 +145,7 @@ the remaining locations or stop continuous polling.
 Repeat `--location-id` to override the location file for an ad hoc run:
 
 ```bash
-python src/openaq_kafka_producer.py \
+python -m environmental_streaming.ingestion.openaq_producer \
   --location-id 2669 \
   --location-id 2936
 ```
@@ -135,7 +153,7 @@ python src/openaq_kafka_producer.py \
 In another terminal, process all available Kafka events:
 
 ```bash
-python src/measurement_kafka_stream.py
+python -m environmental_streaming.processing.measurement_stream
 ```
 
 Valid measurements are aggregated into one-hour event-time windows per source,
@@ -164,13 +182,13 @@ reuse the existing checkpoint implicitly.
 Inspect Kafka events without committing consumer offsets:
 
 ```bash
-python src/kafka_measurement_consumer.py
+python -m environmental_streaming.diagnostics.kafka_consumer
 ```
 
 Audit all Iceberg tables after a pipeline run or backfill:
 
 ```bash
-python src/iceberg_table_audit.py
+python -m environmental_streaming.lakehouse.audit
 ```
 
 The JSON report includes row and data-file counts, duplicate or incomplete identity
@@ -180,7 +198,7 @@ returns a non-zero exit code when any table fails its identity or partition chec
 Inspect small-file and snapshot maintenance needs without changing the tables:
 
 ```bash
-python src/iceberg_table_maintenance.py
+python -m environmental_streaming.lakehouse.maintenance
 ```
 
 The report evaluates small-file and file-count compaction triggers within each hidden
@@ -189,14 +207,14 @@ retention policy. Maintenance only runs when explicitly requested. Compact all k
 tables with Iceberg bin-packing:
 
 ```bash
-python src/iceberg_table_maintenance.py --compact
+python -m environmental_streaming.lakehouse.maintenance --compact
 ```
 
 Expire snapshots older than seven days while always retaining the five most recent
 snapshots per table:
 
 ```bash
-python src/iceberg_table_maintenance.py --expire-snapshots
+python -m environmental_streaming.lakehouse.maintenance --expire-snapshots
 ```
 
 Use `--table canonical`, `--table quarantine`, or `--table hourly` to restrict an
@@ -207,7 +225,7 @@ Kafka offsets or Spark checkpoints.
 Generate a current report for every curated location from the Iceberg tables:
 
 ```bash
-python src/air_quality_insights.py
+python -m environmental_streaming.products.air_quality_insights
 ```
 
 The report contains the latest value per parameter, its measurement age, and the
@@ -217,7 +235,7 @@ without measurements remain visible with the status `missing`. Measurements are
 operational freshness threshold when needed:
 
 ```bash
-python src/air_quality_insights.py \
+python -m environmental_streaming.products.air_quality_insights \
   --freshness-threshold-minutes 60
 ```
 

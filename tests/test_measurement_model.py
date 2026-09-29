@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.types import DoubleType, LongType, StringType, TimestampType
 
-from src.measurement_model import (
+from environmental_streaming.processing.measurement_model import (
     canonical_measurement_schema,
     filter_invalid_measurements,
     filter_valid_measurements,

@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 import requests
 
-from src import openaq_client
+from environmental_streaming.ingestion import openaq_client
 
 
 class FakeResponse:

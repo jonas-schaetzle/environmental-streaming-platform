@@ -6,22 +6,13 @@ from typing import Any
 
 from pyspark.sql import Row, SparkSession
 
-if __package__:
-    from .measurement_kafka_stream import (
-        ICEBERG_CANONICAL_TABLE,
-        ICEBERG_CATALOG,
-        ICEBERG_HOURLY_AGGREGATE_TABLE,
-        ICEBERG_QUARANTINE_TABLE,
-        create_spark_session,
-    )
-else:
-    from measurement_kafka_stream import (
-        ICEBERG_CANONICAL_TABLE,
-        ICEBERG_CATALOG,
-        ICEBERG_HOURLY_AGGREGATE_TABLE,
-        ICEBERG_QUARANTINE_TABLE,
-        create_spark_session,
-    )
+from environmental_streaming.lakehouse.tables import (
+    ICEBERG_CANONICAL_TABLE,
+    ICEBERG_CATALOG,
+    ICEBERG_HOURLY_AGGREGATE_TABLE,
+    ICEBERG_QUARANTINE_TABLE,
+)
+from environmental_streaming.runtime.spark import create_spark_session
 
 
 DEFAULT_TARGET_FILE_SIZE_MB = 128

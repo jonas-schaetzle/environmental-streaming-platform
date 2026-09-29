@@ -1,0 +1,1 @@
+"""Event messaging adapters."""

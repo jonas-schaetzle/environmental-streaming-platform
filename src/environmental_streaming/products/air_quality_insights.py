@@ -9,28 +9,16 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, row_number
 from pyspark.sql.window import Window
 
-if __package__:
-    from .measurement_kafka_stream import (
-        ICEBERG_CANONICAL_TABLE,
-        ICEBERG_HOURLY_AGGREGATE_TABLE,
-        create_spark_session,
-    )
-    from .openaq_kafka_producer import (
-        DEFAULT_LOCATIONS_PATH,
-        OpenAQLocation,
-        load_locations,
-    )
-else:
-    from measurement_kafka_stream import (
-        ICEBERG_CANONICAL_TABLE,
-        ICEBERG_HOURLY_AGGREGATE_TABLE,
-        create_spark_session,
-    )
-    from openaq_kafka_producer import (
-        DEFAULT_LOCATIONS_PATH,
-        OpenAQLocation,
-        load_locations,
-    )
+from environmental_streaming.ingestion.openaq_producer import (
+    DEFAULT_LOCATIONS_PATH,
+    OpenAQLocation,
+    load_locations,
+)
+from environmental_streaming.lakehouse.tables import (
+    ICEBERG_CANONICAL_TABLE,
+    ICEBERG_HOURLY_AGGREGATE_TABLE,
+)
+from environmental_streaming.runtime.spark import create_spark_session
 
 
 DEFAULT_FRESHNESS_THRESHOLD_MINUTES = 120

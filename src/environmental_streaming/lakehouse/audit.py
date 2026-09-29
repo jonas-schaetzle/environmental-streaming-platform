@@ -5,24 +5,14 @@ from typing import Any
 
 from pyspark.sql import SparkSession
 
-if __package__:
-    from .measurement_kafka_stream import (
-        HOURLY_AGGREGATE_IDENTITY_COLUMNS,
-        ICEBERG_CANONICAL_TABLE,
-        ICEBERG_HOURLY_AGGREGATE_TABLE,
-        ICEBERG_QUARANTINE_TABLE,
-        KAFKA_IDENTITY_COLUMNS,
-        create_spark_session,
-    )
-else:
-    from measurement_kafka_stream import (
-        HOURLY_AGGREGATE_IDENTITY_COLUMNS,
-        ICEBERG_CANONICAL_TABLE,
-        ICEBERG_HOURLY_AGGREGATE_TABLE,
-        ICEBERG_QUARANTINE_TABLE,
-        KAFKA_IDENTITY_COLUMNS,
-        create_spark_session,
-    )
+from environmental_streaming.lakehouse.tables import (
+    HOURLY_AGGREGATE_IDENTITY_COLUMNS,
+    ICEBERG_CANONICAL_TABLE,
+    ICEBERG_HOURLY_AGGREGATE_TABLE,
+    ICEBERG_QUARANTINE_TABLE,
+    KAFKA_IDENTITY_COLUMNS,
+)
+from environmental_streaming.runtime.spark import create_spark_session
 
 
 @dataclass(frozen=True)

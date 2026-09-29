@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 
-from src import kafka_publisher
+from environmental_streaming.messaging import kafka_publisher
 
 
 def test_produce_events_uses_sensor_id_as_key_and_serializes_json(

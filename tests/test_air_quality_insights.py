@@ -11,13 +11,13 @@ from pyspark.sql.types import (
     TimestampType,
 )
 
-from src.air_quality_insights import (
+from environmental_streaming.products.air_quality_insights import (
     build_air_quality_report,
     measurement_freshness,
     select_latest_hourly_aggregates,
     select_latest_measurements,
 )
-from src.openaq_kafka_producer import OpenAQLocation
+from environmental_streaming.ingestion.openaq_producer import OpenAQLocation
 
 
 def test_measurement_freshness_handles_boundaries_and_missing_values() -> None:
