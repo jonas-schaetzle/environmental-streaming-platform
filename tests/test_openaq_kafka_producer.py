@@ -5,7 +5,7 @@ from typing import Any
 
 import requests
 
-from src import openaq_kafka_producer
+from environmental_streaming.ingestion import openaq_producer as openaq_kafka_producer
 
 
 def test_build_canonical_events_combines_measurement_and_sensor_metadata() -> None:

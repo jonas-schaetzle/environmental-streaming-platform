@@ -3,10 +3,10 @@ from typing import Any
 
 from confluent_kafka import Consumer, Message
 
-if __package__:
-    from .kafka_publisher import KAFKA_BOOTSTRAP_SERVERS, KAFKA_TOPIC
-else:
-    from kafka_publisher import KAFKA_BOOTSTRAP_SERVERS, KAFKA_TOPIC
+from environmental_streaming.messaging.kafka_publisher import (
+    KAFKA_BOOTSTRAP_SERVERS,
+    KAFKA_TOPIC,
+)
 
 KAFKA_CONSUMER_GROUP = "environmental-streaming-debug-consumer"
 

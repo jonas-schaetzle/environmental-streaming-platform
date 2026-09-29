@@ -4,8 +4,12 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from pyspark.sql import SparkSession
 
-SUPPORTED_JAVA_VERSIONS = ("21", "17", "25")
+from environmental_streaming.lakehouse.tables import ICEBERG_CATALOG
+
+
+SUPPORTED_JAVA_VERSIONS = ("21", "17")
 HOMEBREW_JDK_HOMES = (
     Path("/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"),
     Path("/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"),
@@ -14,6 +18,41 @@ HOMEBREW_JDK_HOMES = (
     Path("/usr/local/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"),
     Path("/usr/local/opt/openjdk/libexec/openjdk.jdk/Contents/Home"),
 )
+SPARK_KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.1"
+ICEBERG_SPARK_PACKAGE = (
+    "org.apache.iceberg:iceberg-spark-runtime-4.1_2.13:1.11.0"
+)
+SPARK_PACKAGES = ",".join((SPARK_KAFKA_PACKAGE, ICEBERG_SPARK_PACKAGE))
+LOCAL_SHUFFLE_PARTITIONS = "4"
+ICEBERG_WAREHOUSE_PATH = str(
+    Path(__file__).resolve().parents[3] / "data" / "warehouse"
+)
+
+
+def create_spark_session() -> SparkSession:
+    configure_java_runtime()
+
+    return (
+        SparkSession.builder.appName("measurement-kafka-stream")
+        .master("local[*]")
+        .config("spark.sql.shuffle.partitions", LOCAL_SHUFFLE_PARTITIONS)
+        .config("spark.sql.session.timeZone", "UTC")
+        .config("spark.jars.packages", SPARK_PACKAGES)
+        .config(
+            "spark.sql.extensions",
+            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+        )
+        .config(
+            f"spark.sql.catalog.{ICEBERG_CATALOG}",
+            "org.apache.iceberg.spark.SparkCatalog",
+        )
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.type", "hadoop")
+        .config(
+            f"spark.sql.catalog.{ICEBERG_CATALOG}.warehouse",
+            ICEBERG_WAREHOUSE_PATH,
+        )
+        .getOrCreate()
+    )
 
 
 def configure_java_runtime() -> str | None:
@@ -35,7 +74,7 @@ def configure_java_runtime() -> str | None:
         return str(discovered_java_home)
 
     raise RuntimeError(
-        "No supported Java runtime found. Spark 4.2 requires Java 17, 21, or 25. "
+        "No supported Java runtime found. Spark 4.1 requires Java 17 or 21. "
         "Install one with `brew install openjdk@21` on macOS, or set JAVA_HOME "
         "to an existing JDK installation."
     )
