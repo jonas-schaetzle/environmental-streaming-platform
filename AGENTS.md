@@ -12,23 +12,28 @@
 
 ## Architecture Boundaries
 
-- `src/openaq_client.py` owns OpenAQ HTTP access and API-key handling.
-- `src/openaq_kafka_producer.py` owns polling, metadata enrichment, and source-side
-  deduplication.
-- `src/kafka_publisher.py` owns event serialization, Kafka keys, and delivery checks.
-- `src/measurement_model.py` owns the canonical contract, normalization, validation,
-  and quarantine reasons.
-- `src/measurement_kafka_stream.py` owns Spark stream orchestration, checkpoints,
-  and valid, quarantine, and hourly aggregate sinks.
-- `src/iceberg_table_audit.py` owns read-only Iceberg table-health and backfill
-  validation.
-- `src/iceberg_table_maintenance.py` owns Iceberg data-file compaction and explicit
-  snapshot-expiration workflows.
-- `src/air_quality_insights.py` owns read-only location freshness and latest-trend
-  product generation from Iceberg.
-- `src/kafka_measurement_consumer.py` is a diagnostic reader and must not commit
-  consumer offsets.
-- `src/spark_runtime.py` owns local Spark and Java runtime discovery.
+- `src/environmental_streaming/ingestion/openaq_client.py` owns OpenAQ HTTP access
+  and API-key handling.
+- `src/environmental_streaming/ingestion/openaq_producer.py` owns polling, metadata
+  enrichment, and source-side deduplication.
+- `src/environmental_streaming/messaging/kafka_publisher.py` owns event
+  serialization, Kafka keys, and delivery checks.
+- `src/environmental_streaming/processing/measurement_model.py` owns the canonical
+  contract, normalization, validation, and quarantine reasons.
+- `src/environmental_streaming/processing/measurement_stream.py` owns Spark stream
+  orchestration, checkpoints, and valid, quarantine, and hourly aggregate sinks.
+- `src/environmental_streaming/lakehouse/tables.py` owns Iceberg table identifiers,
+  column contracts, and table creation.
+- `src/environmental_streaming/lakehouse/audit.py` owns read-only Iceberg
+  table-health and backfill validation.
+- `src/environmental_streaming/lakehouse/maintenance.py` owns Iceberg data-file
+  compaction and explicit snapshot-expiration workflows.
+- `src/environmental_streaming/products/air_quality_insights.py` owns read-only
+  location freshness and latest-trend product generation from Iceberg.
+- `src/environmental_streaming/diagnostics/kafka_consumer.py` is a diagnostic reader
+  and must not commit consumer offsets.
+- `src/environmental_streaming/runtime/spark.py` owns local Spark session and Java
+  runtime discovery.
 - The canonical Kafka topic is `environment.measurements.canonical`.
 - Preserve Kafka trace metadata when routing invalid records to quarantine.
 - Treat idempotency, replay behavior, checkpoints, and late data as explicit design

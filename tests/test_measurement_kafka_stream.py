@@ -15,10 +15,12 @@ from pyspark.sql.types import (
     TimestampType,
 )
 
-from src.measurement_model import filter_invalid_measurements
-from src.measurement_kafka_stream import (
+from environmental_streaming.lakehouse.tables import ensure_iceberg_tables
+from environmental_streaming.processing.measurement_model import (
+    filter_invalid_measurements,
+)
+from environmental_streaming.processing.measurement_stream import (
     aggregate_measurements,
-    ensure_iceberg_tables,
     merge_iceberg_hourly_aggregate_batch,
     merge_iceberg_measurement_batch,
     merge_iceberg_quarantine_batch,

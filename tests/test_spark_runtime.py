@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from src import spark_runtime
+from environmental_streaming.runtime import spark as spark_runtime
 
 
 @pytest.fixture(autouse=True)

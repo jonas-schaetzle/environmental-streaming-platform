@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 from pyspark.sql import SparkSession
 
-from src.iceberg_table_maintenance import (
+from environmental_streaming.lakehouse.maintenance import (
     IcebergMaintenanceConfig,
     TableMaintenanceSpec,
     collect_table_maintenance_state,
@@ -179,15 +179,17 @@ def test_run_maintenance_is_read_only_without_action_flags(
     compact = MagicMock()
     expire = MagicMock()
     monkeypatch.setattr(
-        "src.iceberg_table_maintenance.collect_table_maintenance_state",
+        "environmental_streaming.lakehouse.maintenance."
+        "collect_table_maintenance_state",
         collect_state,
     )
     monkeypatch.setattr(
-        "src.iceberg_table_maintenance.compact_table",
+        "environmental_streaming.lakehouse.maintenance.compact_table",
         compact,
     )
     monkeypatch.setattr(
-        "src.iceberg_table_maintenance.expire_table_snapshots",
+        "environmental_streaming.lakehouse.maintenance."
+        "expire_table_snapshots",
         expire,
     )
     config = IcebergMaintenanceConfig(tables=(spec,))

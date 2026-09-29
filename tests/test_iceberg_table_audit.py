@@ -4,8 +4,11 @@ from unittest.mock import MagicMock
 import pytest
 from pyspark.sql import SparkSession
 
-from src import iceberg_table_audit
-from src.iceberg_table_audit import TableAuditSpec, collect_table_audit
+from environmental_streaming.lakehouse import audit as iceberg_table_audit
+from environmental_streaming.lakehouse.audit import (
+    TableAuditSpec,
+    collect_table_audit,
+)
 
 
 def _query_result(row: dict[str, object] | None) -> MagicMock:

@@ -8,32 +8,18 @@ from typing import Any
 
 import requests
 
-if __package__:
-    from .kafka_publisher import (
-        KAFKA_BOOTSTRAP_SERVERS,
-        KAFKA_TOPIC,
-        produce_events,
-    )
-    from .openaq_client import (
-        extract_sensor_ids,
-        fetch_json,
-        get_required_env_var,
-        latest_measurements_url,
-        sensor_metadata_url,
-    )
-else:
-    from kafka_publisher import (
-        KAFKA_BOOTSTRAP_SERVERS,
-        KAFKA_TOPIC,
-        produce_events,
-    )
-    from openaq_client import (
-        extract_sensor_ids,
-        fetch_json,
-        get_required_env_var,
-        latest_measurements_url,
-        sensor_metadata_url,
-    )
+from environmental_streaming.ingestion.openaq_client import (
+    extract_sensor_ids,
+    fetch_json,
+    get_required_env_var,
+    latest_measurements_url,
+    sensor_metadata_url,
+)
+from environmental_streaming.messaging.kafka_publisher import (
+    KAFKA_BOOTSTRAP_SERVERS,
+    KAFKA_TOPIC,
+    produce_events,
+)
 
 
 DEFAULT_STATE_PATH = Path("data/state/openaq_kafka_producer.json")

@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from src import kafka_measurement_consumer
+from environmental_streaming.diagnostics import kafka_consumer as kafka_measurement_consumer
 
 
 class FakeMessage:
