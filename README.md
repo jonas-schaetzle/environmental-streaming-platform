@@ -4,14 +4,14 @@
 
 Production-oriented streaming data platform for real environmental measurements.
 The current implementation continuously ingests OpenAQ data, publishes canonical
-measurement events to Kafka, validates them with Spark Structured Streaming, and
-separates usable data from quarantined records.
+measurement events to Kafka, processes them with Spark Structured Streaming, and
+stores canonical, quarantined, and hourly aggregate data in Apache Iceberg.
 
 ## Project Documentation
 
-- [Projektstand](docs/projektstand.md)
-- [Projektziel](docs/projektziel.md)
-- [Arbeitsweise](docs/arbeitsweise.md)
+- [Architecture](docs/architecture.md)
+- [Roadmap](docs/roadmap.md)
+- [Development Workflow](docs/development-workflow.md)
 
 ## Architecture
 
@@ -256,21 +256,15 @@ pytest
 GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
 `dev` and `main`, and on release pull requests targeting `main`.
 
-## Canonical Measurement Contract
+## Data Model
 
-- `source`: source system, currently `openaq`
-- `location_id`: source-specific location identifier
-- `sensor_id`: source-specific sensor identifier
-- `parameter`: measured quantity such as `pm25`, `no2`, or `o3`
-- `parameter_display_name`: human-readable parameter name
-- `value`: numeric measurement value
-- `unit`: normalized measurement unit
-- `measured_at_utc`: event timestamp in UTC
-- `latitude`: measurement latitude
-- `longitude`: measurement longitude
+The canonical event contract, Kafka trace fields, Iceberg merge identities,
+partitioning, and state semantics are documented in
+[Architecture](docs/architecture.md).
 
 ## Roadmap
 
-- enrich measurements with weather data
-- expose air-quality anomalies and longer-term trends
-- add operational monitoring and cloud deployment
+Phases 1 and 2 are complete. Phase 3 is in progress: the next outcome is weather
+ingestion followed by temporal and spatial enrichment of air-quality observations.
+See the maintained [Roadmap](docs/roadmap.md) for completed capabilities, upcoming
+work, and phase completion criteria.
