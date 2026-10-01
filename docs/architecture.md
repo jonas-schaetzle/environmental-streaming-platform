@@ -136,10 +136,143 @@ Secrets belong in environment variables or the ignored `.env` file. Producer
 state, Spark checkpoints, Iceberg data, and downloaded measurements belong under
 `data/` and remain untracked.
 
-## Planned Extension
+## Planned Weather Ingestion
 
-Weather ingestion is the next architectural extension. It will enter through a
-source-specific ingestion boundary and receive an explicit storage contract before
-air-quality and weather observations are joined by location and time. A second
-stream processor such as Flink is not planned unless a concrete low-latency use
-case justifies the additional runtime and state model.
+The following contract is the implementation target for Phase 3. Weather ingestion
+is not implemented yet. It will use separate source, model, and stream modules
+within the existing packages, with table definitions owned by `lakehouse`.
+
+### Source And Coverage
+
+Use [Open-Meteo's Forecast API](https://open-meteo.com/en/docs) at
+`https://api.open-meteo.com/v1/forecast` for hourly model-based weather values at
+configured coordinates. These values provide environmental context for OpenAQ
+stations; they are not weather-station measurements. The initial dataset is
+`forecast_best_match`, which records the automatic model-selection policy rather
+than claiming that a single underlying model was used.
+
+Start with configured weather locations for Munich, Stuttgart, and Hamburg. Each
+location has a stable, project-owned `weather_location_id`, a city label, requested
+coordinates, and an explicit mapping from OpenAQ location IDs. Several OpenAQ
+stations may share one weather location. A city-level weather location represents
+regional context, not conditions measured at each station. Changing its requested
+coordinates requires a new ID so that historical rows retain their spatial meaning.
+Preserve the returned grid coordinates separately from the requested coordinates.
+
+Request hourly data in UTC with explicit Celsius, metres-per-second, and millimetre
+settings. Initially publish only hours at or before the current UTC hour. Future
+forecast hours require a separate product decision. Longer historical backfills
+using the [Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api)
+must carry a separate dataset identity: reanalysis and recent forecast-model data
+must not silently replace each other.
+
+The initial portfolio deployment uses the non-commercial API. Keep Open-Meteo
+attribution with weather products and respect the applicable
+[API usage terms and data licence](https://open-meteo.com/en/pricing).
+
+### Weather Event Contract
+
+Publish one event per location, dataset, parameter, and UTC hour. Weather has its
+own contract because model data has no OpenAQ sensor identity.
+
+| Field | Meaning |
+|---|---|
+| `source` | `open_meteo` |
+| `source_dataset` | `forecast_best_match` for the initial source |
+| `weather_location_id` | Stable configured weather location ID, such as `munich` |
+| `city` | Display label; not a join key |
+| `latitude`, `longitude` | Requested WGS84 coordinates from location configuration |
+| `grid_latitude`, `grid_longitude` | Grid coordinates returned by the API |
+| `parameter` | Parameter from the allowlist below |
+| `value` | Finite numeric value |
+| `unit` | Canonical unit for the parameter |
+| `measured_at_utc` | Source's hourly valid-time label, encoded with an explicit UTC offset |
+| `fetched_at_utc` | UTC response-receipt time, assigned once per successful HTTP response |
+
+All listed fields are required. Despite its shared name, `measured_at_utc` is a
+model valid time, not evidence of a physical measurement. `fetched_at_utc` orders
+the responses received by this platform; it is not a model issue time. An actual
+model identifier or run time may only be added when the source provides it.
+
+| Parameter | Canonical unit | Time meaning |
+|---|---|---|
+| `temperature_2m` | `degC` | Value at the labelled hour |
+| `relative_humidity_2m` | `%` | Value at the labelled hour |
+| `precipitation` | `mm` | Total over the preceding hour |
+| `wind_speed_10m` | `m/s` | Value at the labelled hour |
+| `wind_direction_10m` | `degree` | Value at the labelled hour |
+| `pressure_msl` | `hPa` | Value at the labelled hour |
+
+Validation checks required identities, timestamps, coordinate ranges, finite
+values, and parameter/unit compatibility. Humidity is between 0 and 100, wind
+direction between 0 and 360, precipitation and wind speed are non-negative, and
+pressure is positive. Negative Celsius temperatures are valid. Missing source
+values remain missing; they must never become zero. Malformed Kafka events enter
+weather quarantine with a machine-readable reason and their transport metadata.
+
+### Kafka And Iceberg Identities
+
+Use the dedicated topic `environment.weather.canonical` with the Kafka key
+`open_meteo:<weather_location_id>`. This groups a location's events in one partition;
+it does not deduplicate them. Preserve topic, partition, offset, Kafka timestamp,
+key, and raw payload in both weather sinks.
+
+| Planned table | Purpose | Merge identity | Hidden partition |
+|---|---|---|---|
+| `local.lake.canonical_weather_observations` | Latest accepted weather value per business key | Source, dataset, weather location, parameter, and `measured_at_utc` | Day of `measured_at_utc` |
+| `local.lake.quarantine_weather_observations` | Invalid weather events and Kafka lineage | Kafka topic, partition, and offset | Day of `kafka_timestamp` |
+
+The canonical business key survives republishing with new Kafka offsets. Insert
+new keys and update existing keys only when the incoming `fetched_at_utc` is newer.
+An older response or an identical replay cannot overwrite a later accepted row.
+Reduce each micro-batch to one newest response per business key before `MERGE`;
+conflicting values with equal fetch timestamps must be surfaced as a conflict.
+This assumes a single active producer per configured location and a reliable UTC
+clock. Multiple writers would require a stronger revision-ordering contract.
+
+Canonical weather rows retain the payload and Kafka lineage of the accepted
+response. This is a latest-value table, not a permanent history of every revision.
+Older revisions remain available only within Kafka and Iceberg snapshot retention.
+
+### Replay, Progress, And Time
+
+Poll with a configurable overlap, initially the last three hours plus the current
+hour, so revised values for an existing hour can be published. Persist a content
+fingerprint per business key after confirmed Kafka delivery; exclude
+`fetched_at_utc` from the fingerprint so unchanged responses are suppressed.
+Republish changed values even when their event time has already been seen.
+Keep producer state under `data/state/` and fingerprint retention bounded to the
+active polling range. A timestamp-only high-water mark would suppress corrections.
+
+A crash after Kafka delivery but before state persistence can produce a duplicate;
+the sink's business key handles it. Replay saved events with their original fetch
+timestamps. A new API fetch is a new response, whereas replaying an existing payload
+is not. Corrections outside the overlap and gaps after a longer outage require an
+explicit date-range catch-up within source availability; the overlap alone does not
+guarantee complete history.
+
+Weather canonical and quarantine queries will own separate checkpoints at
+`data/checkpoints/weather_canonical` and `data/checkpoints/weather_quarantine`.
+They initially follow the existing `availableNow` processing pattern. Existing
+checkpoints own continuation; only a new checkpoint starts at earliest offsets.
+Business-key merges also protect the canonical sink when republished events have
+new transport identities. Producer state, checkpoints, and lake data are never
+deleted to trigger replay.
+
+Use `measured_at_utc` for event-time alignment and `fetched_at_utc` for ingestion
+lineage. The initial weather sinks have no aggregation watermark and accept old
+valid rows and newer responses for old hours. The existing two-hour OpenAQ
+watermark remains specific to air-quality aggregation. Later joins must explicitly
+define how weather corrections update already-produced analytical results.
+
+Join through the configured location mapping and UTC time, accounting for each
+parameter's time meaning. For example, precipitation labelled `11:00Z` describes
+the hour from `10:00Z` to `11:00Z`, so it aligns with the air-quality window starting
+at `10:00Z`. Temperature labelled `11:00Z` is a point value and must not be presented
+as that window's hourly average.
+
+This extension adds topics, tables, and checkpoints without migrating the existing
+OpenAQ contract or state. Contract and identity changes after the first weather
+deployment require an explicit compatibility and migration decision. A second
+stream processor such as Flink remains conditional on a concrete low-latency use
+case that justifies another runtime and state model.
