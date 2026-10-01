@@ -77,6 +77,34 @@ Next outcomes:
 4. Add city comparison and longer-term time-series views.
 5. Introduce explainable anomaly and missing-data alerts.
 
+### Next Package - Weather Ingestion
+
+The [planned weather architecture](architecture.md#planned-weather-ingestion)
+defines Open-Meteo hourly model data, a dedicated event contract, dataset-aware
+business identities, and correction and replay semantics. This is a documented
+implementation target; weather ingestion is not yet available.
+
+Deliver it in small, reviewable steps:
+
+1. Add weather location configuration and explicit OpenAQ-to-weather mappings for
+   Munich, Stuttgart, and Hamburg, then implement and test the weather contract,
+   units, validation, and UTC time rules.
+2. Add the Open-Meteo client and producer with bounded retries, per-location failure
+   isolation, overlapping polls, correction-aware state, and verified delivery to
+   `environment.weather.canonical`.
+3. Add separate weather Spark queries and Iceberg tables with Kafka lineage,
+   newest-response business-key upserts, quarantine, and dedicated checkpoints.
+4. Verify the real source-to-Kafka-to-Iceberg path, restart behavior, replay with
+   new Kafka offsets, changed values for the same hour, out-of-order responses,
+   and explicit catch-up after a polling gap. Extend read-only table auditing and
+   document the operating commands in the README.
+
+The package is complete when real weather values for the configured locations
+reach Iceberg, unchanged or replayed data creates no duplicate business keys,
+newer responses update existing keys, older replays cannot revert them, and invalid
+events retain their trace metadata in quarantine. Air-quality joins and alerts are
+subsequent packages.
+
 Phase 3 is complete when the platform provides a reproducible environmental view
 that combines air quality and weather, supports comparison over time, and emits
 actionable alerts with traceable evidence.
