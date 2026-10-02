@@ -262,6 +262,11 @@ The canonical event contract, Kafka trace fields, Iceberg merge identities,
 partitioning, and state semantics are documented in
 [Architecture](docs/architecture.md).
 
+The weather model in `processing/weather_model.py` provides a tested contract for
+hourly model data with parameter-specific validation, explicit UTC timestamps, and
+invalid-event reasons while preserving input lineage. Weather source ingestion,
+Kafka publishing, and Iceberg storage are planned and do not run yet.
+
 ## Roadmap
 
 Phases 1 and 2 are complete. Phase 3 is in progress: the next outcome is weather
