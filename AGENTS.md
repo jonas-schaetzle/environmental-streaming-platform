@@ -20,6 +20,8 @@
   serialization, Kafka keys, and delivery checks.
 - `src/environmental_streaming/processing/measurement_model.py` owns the canonical
   contract, normalization, validation, and quarantine reasons.
+- `src/environmental_streaming/processing/weather_model.py` owns the weather
+  contract, payload parsing, UTC validation, and quarantine reasons.
 - `src/environmental_streaming/processing/measurement_stream.py` owns Spark stream
   orchestration, checkpoints, and valid, quarantine, and hourly aggregate sinks.
 - `src/environmental_streaming/lakehouse/tables.py` owns Iceberg table identifiers,

@@ -68,6 +68,8 @@ Already delivered:
 - read-only location freshness and latest-value reporting
 - finalized hourly trend statistics for curated locations
 - explicit `fresh`, `stale`, and `missing` data-availability states
+- a tested weather event model with canonical units, parameter-specific validation,
+  explicit UTC time rules, and valid/invalid routing that preserves input lineage
 
 Next outcomes:
 
@@ -81,14 +83,13 @@ Next outcomes:
 
 The [planned weather architecture](architecture.md#planned-weather-ingestion)
 defines Open-Meteo hourly model data, a dedicated event contract, dataset-aware
-business identities, and correction and replay semantics. This is a documented
-implementation target; weather ingestion is not yet available.
+business identities, and correction and replay semantics. The weather contract and
+its validation tests are implemented; weather ingestion is not yet available.
 
 Deliver it in small, reviewable steps:
 
 1. Add weather location configuration and explicit OpenAQ-to-weather mappings for
-   Munich, Stuttgart, and Hamburg, then implement and test the weather contract,
-   units, validation, and UTC time rules.
+   Munich, Stuttgart, and Hamburg using the implemented weather contract.
 2. Add the Open-Meteo client and producer with bounded retries, per-location failure
    isolation, overlapping polls, correction-aware state, and verified delivery to
    `environment.weather.canonical`.

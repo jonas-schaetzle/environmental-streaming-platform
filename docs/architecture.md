@@ -138,9 +138,11 @@ state, Spark checkpoints, Iceberg data, and downloaded measurements belong under
 
 ## Planned Weather Ingestion
 
-The following contract is the implementation target for Phase 3. Weather ingestion
-is not implemented yet. It will use separate source, model, and stream modules
-within the existing packages, with table definitions owned by `lakehouse`.
+The weather event model is implemented and tested in
+`processing/weather_model.py`. Source ingestion, Kafka publishing, and weather
+storage remain implementation targets for Phase 3. They will use separate source
+and stream modules within the existing packages, with table definitions owned by
+`lakehouse`.
 
 ### Source And Coverage
 
@@ -194,6 +196,13 @@ model valid time, not evidence of a physical measurement. `fetched_at_utc` order
 the responses received by this platform; it is not a model issue time. An actual
 model identifier or run time may only be added when the source provides it.
 
+The implemented model accepts `open_meteo` and `forecast_best_match`. Supporting a
+historical dataset requires an explicit extension of validation. Timestamp strings
+use ISO 8601 with seconds, an optional fraction of up to six digits, and `Z` or
+`+00:00`. Missing offsets and local-time offsets are rejected before routing.
+`measured_at_utc` must lie on a full UTC hour and must not exceed `fetched_at_utc`.
+This rule excludes future hours without comparing replayed data to the wall clock.
+
 | Parameter | Canonical unit | Time meaning |
 |---|---|---|
 | `temperature_2m` | `degC` | Value at the labelled hour |
@@ -209,6 +218,19 @@ direction between 0 and 360, precipitation and wind speed are non-negative, and
 pressure is positive. Negative Celsius temperatures are valid. Missing source
 values remain missing; they must never become zero. Malformed Kafka events enter
 weather quarantine with a machine-readable reason and their transport metadata.
+
+`parse_weather_observations` consumes a DataFrame containing JSON in `raw_value`
+and preserves its metadata columns. It produces typed canonical fields and a
+comma-separated `validation_error`, which is empty for valid rows. The valid and
+invalid filter functions form complementary routes; the valid route drops the
+error column. Malformed JSON and type errors are marked `invalid_payload`, and
+missing, invalid, or unsupported fields receive specific reasons. Raw payloads
+remain available even when parsing fails. Units must match the canonical units in
+the table; the model does not infer units or convert incompatible quantities.
+
+This model does not yet write quarantine records or connect to Kafka or Iceberg.
+It introduces a separate contract without changing the OpenAQ payload schema,
+existing checkpoints, or table identities.
 
 ### Kafka And Iceberg Identities
 
