@@ -153,13 +153,35 @@ stations; they are not weather-station measurements. The initial dataset is
 `forecast_best_match`, which records the automatic model-selection policy rather
 than claiming that a single underlying model was used.
 
-Start with configured weather locations for Munich, Stuttgart, and Hamburg. Each
+`config/weather_locations.json` defines weather locations for Munich, Stuttgart,
+and Hamburg. `ingestion/weather_locations.py` loads and validates the configuration
+as immutable `WeatherLocation` objects. Each
 location has a stable, project-owned `weather_location_id`, a city label, requested
 coordinates, and an explicit mapping from OpenAQ location IDs. Several OpenAQ
 stations may share one weather location. A city-level weather location represents
 regional context, not conditions measured at each station. Changing its requested
 coordinates requires a new ID so that historical rows retain their spatial meaning.
 Preserve the returned grid coordinates separately from the requested coordinates.
+
+The configured city reference coordinates were checked against Open-Meteo's
+Geocoding API on 2026-10-05:
+[Munich](https://geocoding-api.open-meteo.com/v1/search?name=Munich&count=1&language=en&format=json),
+[Stuttgart](https://geocoding-api.open-meteo.com/v1/search?name=Stuttgart&count=1&language=en&format=json),
+and [Hamburg](https://geocoding-api.open-meteo.com/v1/search?name=Hamburg&count=1&language=en&format=json).
+They are fixed configuration values, not a geocoding lookup on each run.
+`openaq_location_ids` must be a non-empty list of positive integer IDs. Each ID
+may appear only once across the entire configuration, while one weather location
+may cover multiple stations. The loader rejects duplicate weather IDs, empty
+labels, non-numeric or non-finite coordinates, and coordinates outside WGS84
+latitude/longitude bounds. It trims surrounding whitespace from weather IDs and
+city labels before checking uniqueness. It validates mapping structure; it does
+not call OpenAQ to verify station existence or require every configured station
+to have weather coverage. A repository test checks that the curated files agree.
+
+Weather IDs identify fixed reference coordinates over time. Editing a city's
+reference point requires a new weather ID and an explicit mapping update, even
+though no weather processing state exists yet. Station mappings are static for
+now; changes after ingestion starts require a documented historical join policy.
 
 Request hourly data in UTC with explicit Celsius, metres-per-second, and millimetre
 settings. Initially publish only hours at or before the current UTC hour. Future

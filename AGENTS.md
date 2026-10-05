@@ -16,6 +16,8 @@
   and API-key handling.
 - `src/environmental_streaming/ingestion/openaq_producer.py` owns polling, metadata
   enrichment, and source-side deduplication.
+- `src/environmental_streaming/ingestion/weather_locations.py` owns weather location
+  configuration and unambiguous OpenAQ-to-weather mappings.
 - `src/environmental_streaming/messaging/kafka_publisher.py` owns event
   serialization, Kafka keys, and delivery checks.
 - `src/environmental_streaming/processing/measurement_model.py` owns the canonical

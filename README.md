@@ -267,6 +267,12 @@ hourly model data with parameter-specific validation, explicit UTC timestamps, a
 invalid-event reasons while preserving input lineage. Weather source ingestion,
 Kafka publishing, and Iceberg storage are planned and do not run yet.
 
+[Weather location configuration](config/weather_locations.json) defines fixed city
+reference coordinates for Munich, Stuttgart, and Hamburg and maps the curated
+OpenAQ stations to those locations. The loader in `ingestion/weather_locations.py`
+validates coordinates and prevents duplicate or ambiguous mappings. These points
+provide city-level context rather than weather measured at the OpenAQ stations.
+
 ## Roadmap
 
 Phases 1 and 2 are complete. Phase 3 is in progress: the next outcome is weather
