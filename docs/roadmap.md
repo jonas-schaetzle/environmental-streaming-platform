@@ -70,6 +70,8 @@ Already delivered:
 - explicit `fresh`, `stale`, and `missing` data-availability states
 - a tested weather event model with canonical units, parameter-specific validation,
   explicit UTC time rules, and valid/invalid routing that preserves input lineage
+- configured weather reference locations for Munich, Stuttgart, and Hamburg with
+  a tested loader and unambiguous mappings from the curated OpenAQ stations
 
 Next outcomes:
 
@@ -83,19 +85,18 @@ Next outcomes:
 
 The [planned weather architecture](architecture.md#planned-weather-ingestion)
 defines Open-Meteo hourly model data, a dedicated event contract, dataset-aware
-business identities, and correction and replay semantics. The weather contract and
-its validation tests are implemented; weather ingestion is not yet available.
+business identities, and correction and replay semantics. The weather contract,
+location configuration, and their validation tests are implemented; weather
+ingestion is not yet available.
 
 Deliver it in small, reviewable steps:
 
-1. Add weather location configuration and explicit OpenAQ-to-weather mappings for
-   Munich, Stuttgart, and Hamburg using the implemented weather contract.
-2. Add the Open-Meteo client and producer with bounded retries, per-location failure
+1. Add the Open-Meteo client and producer with bounded retries, per-location failure
    isolation, overlapping polls, correction-aware state, and verified delivery to
    `environment.weather.canonical`.
-3. Add separate weather Spark queries and Iceberg tables with Kafka lineage,
+2. Add separate weather Spark queries and Iceberg tables with Kafka lineage,
    newest-response business-key upserts, quarantine, and dedicated checkpoints.
-4. Verify the real source-to-Kafka-to-Iceberg path, restart behavior, replay with
+3. Verify the real source-to-Kafka-to-Iceberg path, restart behavior, replay with
    new Kafka offsets, changed values for the same hour, out-of-order responses,
    and explicit catch-up after a polling gap. Extend read-only table auditing and
    document the operating commands in the README.
