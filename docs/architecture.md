@@ -138,11 +138,11 @@ state, Spark checkpoints, Iceberg data, and downloaded measurements belong under
 
 ## Planned Weather Ingestion
 
-The weather event model is implemented and tested in
-`processing/weather_model.py`. Source ingestion, Kafka publishing, and weather
-storage remain implementation targets for Phase 3. They will use separate source
-and stream modules within the existing packages, with table definitions owned by
-`lakehouse`.
+The weather event model, location configuration, and Open-Meteo HTTP client are
+implemented and tested. The client supports one-shot raw captures. Producer
+polling, canonical Kafka publishing, and weather storage remain implementation
+targets for Phase 3. They will use separate source and stream modules within the
+existing packages, with table definitions owned by `lakehouse`.
 
 ### Source And Coverage
 
@@ -193,6 +193,37 @@ must not silently replace each other.
 The initial portfolio deployment uses the non-commercial API. Keep Open-Meteo
 attribution with weather products and respect the applicable
 [API usage terms and data licence](https://open-meteo.com/en/pricing).
+
+### HTTP Client And Raw Captures
+
+`ingestion/weather_client.py` owns HTTP access to the Forecast API. Its
+`fetch_hourly_weather` function accepts a validated `WeatherLocation` and returns
+an `HourlyWeatherResponse` containing the decoded API payload and one timezone-aware
+UTC response-receipt timestamp, assigned before JSON decoding and validation.
+
+The request uses the six contract parameters, UTC, ISO 8601 time labels, Celsius,
+metres-per-second wind speed, and millimetre precipitation. Default request bounds
+are `past_hours=3` and `forecast_hours=1`, covering the recent overlap and current
+hour. Automatic model selection supplies the `forecast_best_match` dataset.
+The client verifies a zero UTC offset, a non-empty hourly time array, parameter
+arrays of matching length, and the expected source units. Raw ISO time labels have
+no offset suffix; the future producer must explicitly encode their UTC meaning as
+canonical timestamps. Source temperature and wind-direction unit symbols likewise
+need mapping to `degC` and `degree` before event validation.
+
+The HTTP defaults are a 30-second request timeout, at most four attempts, and
+exponential retry delays starting at one second. Connection errors, timeouts, and
+HTTP 429/500/502/503/504 responses are retried. Other HTTP failures, invalid JSON,
+and malformed response envelopes fail without retry. Missing individual values
+remain present as nulls; domain validation belongs to the event model.
+
+The one-shot CLI selects a configured weather ID and creates an exclusive,
+timestamped snapshot under `data/weather/`. Captures include requested location
+metadata, source/dataset identity, the receipt timestamp, and the response with
+its returned grid coordinates. They preserve source evidence without advancing
+producer progress or Spark offsets. Snapshots are not canonical events and are
+not ready for direct Kafka replay. Weather publishing, overlap deduplication, and
+explicit date-range catch-up remain producer work.
 
 ### Weather Event Contract
 

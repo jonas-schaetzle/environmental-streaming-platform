@@ -246,6 +246,29 @@ All runtime state, checkpoints, and measurement outputs live under `data/` and a
 excluded from version control. Legacy Parquet outputs and checkpoints may remain
 there after the Iceberg cutover, but the pipeline no longer updates or deletes them.
 
+## Weather Source Check
+
+Capture hourly weather for one configured location using the public non-commercial
+Open-Meteo endpoint:
+
+```bash
+python -m environmental_streaming.ingestion.weather_client \
+  --weather-location-id munich
+```
+
+Use `stuttgart` or `hamburg` for the other curated locations. The command requires
+no OpenAQ key or running Kafka/Spark services. By default it requests the previous
+three hours plus the current hour, in UTC with Celsius, metres-per-second wind
+speed, and millimetre precipitation. Use `--past-hours 6` to expand the recent range
+or `--locations-file path/to/weather_locations.json` for another location file.
+
+Each successful capture creates a timestamped JSON file under `data/weather/` and
+prints a JSON report containing the location ID, fetch time, hour count, and file
+path. The snapshot preserves requested coordinates, station mappings, source and
+dataset labels, the UTC response-receipt time, and the decoded API response.
+Existing captures are never overwritten. This is a raw source check; event
+conversion, Kafka publication, and weather Iceberg writes follow in later packages.
+
 ## Verification
 
 ```bash
@@ -264,8 +287,9 @@ partitioning, and state semantics are documented in
 
 The weather model in `processing/weather_model.py` provides a tested contract for
 hourly model data with parameter-specific validation, explicit UTC timestamps, and
-invalid-event reasons while preserving input lineage. Weather source ingestion,
-Kafka publishing, and Iceberg storage are planned and do not run yet.
+invalid-event reasons while preserving input lineage. The Open-Meteo HTTP client
+supports raw source checks; weather Kafka publishing and Iceberg storage are
+planned and do not run yet.
 
 [Weather location configuration](config/weather_locations.json) defines fixed city
 reference coordinates for Munich, Stuttgart, and Hamburg and maps the curated

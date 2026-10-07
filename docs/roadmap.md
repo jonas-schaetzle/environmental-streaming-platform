@@ -72,6 +72,8 @@ Already delivered:
   explicit UTC time rules, and valid/invalid routing that preserves input lineage
 - configured weather reference locations for Munich, Stuttgart, and Hamburg with
   a tested loader and unambiguous mappings from the curated OpenAQ stations
+- a tested Open-Meteo HTTP client with bounded retries, explicit request units and
+  UTC, response-envelope validation, and one-shot raw captures with receipt lineage
 
 Next outcomes:
 
@@ -86,13 +88,15 @@ Next outcomes:
 The [planned weather architecture](architecture.md#planned-weather-ingestion)
 defines Open-Meteo hourly model data, a dedicated event contract, dataset-aware
 business identities, and correction and replay semantics. The weather contract,
-location configuration, and their validation tests are implemented; weather
-ingestion is not yet available.
+location configuration, HTTP client, and their validation tests are implemented.
+Raw source checks are available; canonical weather ingestion into Kafka and
+Iceberg remains planned.
 
 Deliver it in small, reviewable steps:
 
-1. Add the Open-Meteo client and producer with bounded retries, per-location failure
-   isolation, overlapping polls, correction-aware state, and verified delivery to
+1. Add the weather producer using the implemented Open-Meteo client, with
+   per-location failure isolation, overlapping polls, correction-aware state,
+   canonical event conversion, and verified delivery to
    `environment.weather.canonical`.
 2. Add separate weather Spark queries and Iceberg tables with Kafka lineage,
    newest-response business-key upserts, quarantine, and dedicated checkpoints.
