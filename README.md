@@ -266,8 +266,24 @@ Each successful capture creates a timestamped JSON file under `data/weather/` an
 prints a JSON report containing the location ID, fetch time, hour count, and file
 path. The snapshot preserves requested coordinates, station mappings, source and
 dataset labels, the UTC response-receipt time, and the decoded API response.
-Existing captures are never overwritten. This is a raw source check; event
-conversion, Kafka publication, and weather Iceberg writes follow in later packages.
+Existing captures are never overwritten. Convert a saved capture into canonical
+JSON Lines events (replace the example filename with the reported capture path):
+
+```bash
+python -m environmental_streaming.ingestion.weather_events \
+  --capture-file "data/weather/open_meteo_<timestamp>.json"
+```
+
+The export creates `<capture-name>_canonical.jsonl` under `data/weather/` without
+overwriting existing files. Each line contains one parameter for one UTC hour,
+with canonical units, requested and returned grid coordinates, and the original
+receipt timestamp. Future hours relative to that timestamp are excluded. The
+export uses the saved location metadata, not today's location configuration.
+Missing or invalid individual values remain unchanged for downstream validation;
+an export is not a guarantee of valid data. Invalid time labels, duplicate hours,
+or broken response envelopes fail the conversion before a file is created.
+Neither command publishes to Kafka or changes producer state or checkpoints.
+Weather Kafka publication and Iceberg writes follow in later packages.
 
 ## Verification
 
@@ -288,8 +304,9 @@ partitioning, and state semantics are documented in
 The weather model in `processing/weather_model.py` provides a tested contract for
 hourly model data with parameter-specific validation, explicit UTC timestamps, and
 invalid-event reasons while preserving input lineage. The Open-Meteo HTTP client
-supports raw source checks; weather Kafka publishing and Iceberg storage are
-planned and do not run yet.
+supports raw source checks, and `ingestion/weather_events.py` converts responses
+and saved captures into canonical event payloads. Weather Kafka publishing and
+Iceberg storage are planned and do not run yet.
 
 [Weather location configuration](config/weather_locations.json) defines fixed city
 reference coordinates for Munich, Stuttgart, and Hamburg and maps the curated
