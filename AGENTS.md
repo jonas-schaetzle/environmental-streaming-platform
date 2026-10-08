@@ -22,6 +22,8 @@
   access, response-envelope checks, receipt timestamps, and one-shot raw captures.
 - `src/environmental_streaming/ingestion/weather_events.py` owns source-to-event
   conversion and canonical exports from saved weather captures.
+- `src/environmental_streaming/ingestion/weather_replay.py` owns one-shot replay
+  of saved canonical weather events without changing their receipt timestamps.
 - `src/environmental_streaming/messaging/kafka_publisher.py` owns event
   serialization, Kafka keys, and delivery checks.
 - `src/environmental_streaming/processing/measurement_model.py` owns the canonical
