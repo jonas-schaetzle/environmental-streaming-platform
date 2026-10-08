@@ -1,7 +1,11 @@
 import json
 from typing import Any
 
-from environmental_streaming.diagnostics import kafka_consumer as kafka_measurement_consumer
+import pytest
+
+from environmental_streaming.diagnostics import (
+    kafka_consumer as kafka_measurement_consumer,
+)
 
 
 class FakeMessage:
@@ -55,7 +59,10 @@ def test_decode_message_returns_kafka_metadata_and_json_value() -> None:
     }
 
 
-def test_consume_events_polls_until_timeout(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    "topic", ["environment.measurements.canonical", "environment.weather.canonical"]
+)
+def test_consume_events_polls_until_timeout(monkeypatch, topic: str) -> None:
     closed = False
 
     class FakeConsumer:
@@ -76,7 +83,7 @@ def test_consume_events_polls_until_timeout(monkeypatch) -> None:
             ]
 
         def subscribe(self, topics: list[str]) -> None:
-            assert topics == ["environment.measurements.canonical"]
+            assert topics == [topic]
 
         def poll(self, timeout: float) -> Any:
             assert timeout == 0.1
@@ -92,6 +99,7 @@ def test_consume_events_polls_until_timeout(monkeypatch) -> None:
         max_messages=10,
         timeout_seconds=0.1,
         group_id="test-group",
+        topic=topic,
     )
 
     assert closed is True

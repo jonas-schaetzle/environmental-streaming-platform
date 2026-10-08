@@ -1,3 +1,4 @@
+import argparse
 import json
 from typing import Any
 
@@ -42,9 +43,10 @@ def consume_events(
     max_messages: int = 10,
     timeout_seconds: float = 5.0,
     group_id: str = KAFKA_CONSUMER_GROUP,
+    topic: str = KAFKA_TOPIC,
 ) -> list[dict[str, Any]]:
     consumer = create_consumer(group_id)
-    consumer.subscribe([KAFKA_TOPIC])
+    consumer.subscribe([topic])
 
     events = []
 
@@ -66,12 +68,25 @@ def consume_events(
 
 
 def main() -> None:
-    events = consume_events()
+    parser = argparse.ArgumentParser(
+        description="Inspect Kafka events without committing offsets."
+    )
+    parser.add_argument("--topic", default=KAFKA_TOPIC)
+    parser.add_argument("--max-messages", type=int, default=10)
+    parser.add_argument("--timeout-seconds", type=float, default=5.0)
+    parser.add_argument("--group-id", default=KAFKA_CONSUMER_GROUP)
+    args = parser.parse_args()
+    events = consume_events(
+        max_messages=args.max_messages,
+        timeout_seconds=args.timeout_seconds,
+        group_id=args.group_id,
+        topic=args.topic,
+    )
 
     for event in events:
         print(json.dumps(event, ensure_ascii=False))
 
-    print(f"Consumed {len(events)} events from {KAFKA_TOPIC}")
+    print(f"Consumed {len(events)} events from {args.topic}")
 
 
 if __name__ == "__main__":

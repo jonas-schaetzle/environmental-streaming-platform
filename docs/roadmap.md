@@ -76,6 +76,8 @@ Already delivered:
   UTC, response-envelope validation, and one-shot raw captures with receipt lineage
 - tested source-to-event conversion and canonical JSON Lines exports from saved
   captures, preserving receipt time and coordinates for deterministic replay
+- one-shot replay of saved weather events to a dedicated Kafka topic, with
+  location keys, delivery-error checks, and offset-free diagnostic inspection
 
 Next outcomes:
 
@@ -91,9 +93,9 @@ The [planned weather architecture](architecture.md#planned-weather-ingestion)
 defines Open-Meteo hourly model data, a dedicated event contract, dataset-aware
 business identities, and correction and replay semantics. The weather contract,
 location configuration, HTTP client, canonical conversion, and their validation
-tests are implemented. Raw source checks and event exports are available;
-canonical weather ingestion into Kafka and
-Iceberg remains planned.
+tests are implemented. Raw source checks, event exports, and explicit Kafka
+replay are available. Automated polling and weather ingestion into Iceberg
+remain planned.
 
 Deliver it in small, reviewable steps:
 

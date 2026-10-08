@@ -140,8 +140,8 @@ state, Spark checkpoints, Iceberg data, and downloaded measurements belong under
 
 The weather event model, location configuration, Open-Meteo HTTP client, and
 canonical event conversion are implemented and tested. The client supports
-one-shot raw captures, which can be exported as canonical JSON Lines events. Producer
-polling, canonical Kafka publishing, and weather storage remain implementation
+one-shot raw captures, which can be exported as canonical JSON Lines events and
+explicitly replayed to Kafka. Producer polling and weather storage remain implementation
 targets for Phase 3. They will use separate source and stream modules within the
 existing packages, with table definitions owned by `lakehouse`.
 
@@ -223,7 +223,7 @@ timestamped snapshot under `data/weather/`. Captures include requested location
 metadata, source/dataset identity, the receipt timestamp, and the response with
 its returned grid coordinates. They preserve source evidence without advancing
 producer progress or Spark offsets. Snapshots are not canonical events and must
-be converted before Kafka replay. Weather publishing, overlap deduplication, and
+be converted before Kafka replay. Automated publishing, overlap deduplication, and
 explicit date-range catch-up remain producer work.
 
 ### Canonical Event Conversion
@@ -311,10 +311,27 @@ existing checkpoints, or table identities.
 
 ### Kafka And Iceberg Identities
 
-Use the dedicated topic `environment.weather.canonical` with the Kafka key
+The implemented one-shot replay uses `environment.weather.canonical` with the Kafka key
 `open_meteo:<weather_location_id>`. This groups a location's events in one partition;
 it does not deduplicate them. Preserve topic, partition, offset, Kafka timestamp,
 key, and raw payload in both weather sinks.
+
+`messaging/kafka_publisher.py` owns both source-specific key functions and shared
+serialization and delivery checks. The OpenAQ default topic and sensor key remain
+unchanged. Delivery callbacks surface permanent failures even when the producer
+queue is empty; a 30-second flush timeout bounds the final delivery wait for both
+sources. A failed or timed-out batch may already have delivered some records.
+
+`ingestion/weather_replay.py` preflights the complete JSON Lines file for basic
+envelope identities and the presence of original timestamps, then publishes its
+unchanged payloads. It does not certify domain validity, assign new receipt times,
+fetch data, or write progress state. Explicit replay may create duplicate business
+keys at new Kafka offsets. Deduplication and newest-response handling remain
+planned sink responsibilities, not guarantees of a Kafka key. The diagnostic
+reader accepts a topic argument and never commits consumer offsets.
+
+No OpenAQ payload, Kafka identity, Iceberg schema, or checkpoint changes are
+introduced by this publishing extension; no data migration is required.
 
 | Planned table | Purpose | Merge identity | Hidden partition |
 |---|---|---|---|

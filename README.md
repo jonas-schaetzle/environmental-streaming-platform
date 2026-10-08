@@ -283,7 +283,41 @@ Missing or invalid individual values remain unchanged for downstream validation;
 an export is not a guarantee of valid data. Invalid time labels, duplicate hours,
 or broken response envelopes fail the conversion before a file is created.
 Neither command publishes to Kafka or changes producer state or checkpoints.
-Weather Kafka publication and Iceberg writes follow in later packages.
+
+### Weather Kafka Replay
+
+Start the local Kafka broker with `docker compose up -d` and create the separate
+weather topic once (existing topics are left intact):
+
+```bash
+docker exec environmental-streaming-kafka /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 --create --if-not-exists \
+  --topic environment.weather.canonical --partitions 3 --replication-factor 1
+
+python -m environmental_streaming.ingestion.weather_replay \
+  --events-file "data/weather/open_meteo_<timestamp>_canonical.jsonl"
+
+python -m environmental_streaming.diagnostics.kafka_consumer \
+  --topic environment.weather.canonical --max-messages 24 \
+  --group-id weather-replay-check
+```
+
+The replay command checks the entire file for JSON objects, supported
+source/dataset identities, non-empty location IDs, and the presence of both
+original timestamps before sending anything. It preserves the event payloads,
+including receipt times and invalid individual values for future quarantine.
+Domain validation still belongs to the weather model. Records use the key
+`open_meteo:<weather_location_id>`; success is reported only after Kafka delivery
+callbacks complete without errors and no records remain queued within 30 seconds.
+Use `--bootstrap-servers host:port` to publish to another broker.
+
+Replay is explicit and has no persistent deduplication state. Running it again,
+or retrying after partial delivery, can create new Kafka offsets for the same
+business keys. Keys group events by location; they do not deduplicate records.
+The diagnostic reader starts at the earliest available offsets for its group and
+never commits offsets, so its output can include earlier replays. No producer
+state or Spark checkpoints are changed. Automated polling, correction-aware
+deduplication, weather Spark sinks, and Iceberg storage remain planned.
 
 ## Verification
 
@@ -305,8 +339,9 @@ The weather model in `processing/weather_model.py` provides a tested contract fo
 hourly model data with parameter-specific validation, explicit UTC timestamps, and
 invalid-event reasons while preserving input lineage. The Open-Meteo HTTP client
 supports raw source checks, and `ingestion/weather_events.py` converts responses
-and saved captures into canonical event payloads. Weather Kafka publishing and
-Iceberg storage are planned and do not run yet.
+and saved captures into canonical event payloads. Saved events can be replayed to
+the dedicated weather Kafka topic; automated polling and weather Iceberg storage
+are planned and do not run yet.
 
 [Weather location configuration](config/weather_locations.json) defines fixed city
 reference coordinates for Munich, Stuttgart, and Hamburg and maps the curated
