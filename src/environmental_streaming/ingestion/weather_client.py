@@ -84,13 +84,13 @@ def fetch_hourly_weather(
         else:
             fetched_at_utc = datetime.now(timezone.utc)
             payload = response.json()
-            _validate_hourly_response(payload)
+            validate_hourly_response(payload)
             return HourlyWeatherResponse(payload, fetched_at_utc)
 
     raise RuntimeError("Open-Meteo request retry loop ended unexpectedly.")
 
 
-def _validate_hourly_response(payload: Any) -> None:
+def validate_hourly_response(payload: Any) -> None:
     if not isinstance(payload, dict):
         raise ValueError("Open-Meteo must return a JSON object.")
     if (

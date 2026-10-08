@@ -138,8 +138,9 @@ state, Spark checkpoints, Iceberg data, and downloaded measurements belong under
 
 ## Planned Weather Ingestion
 
-The weather event model, location configuration, and Open-Meteo HTTP client are
-implemented and tested. The client supports one-shot raw captures. Producer
+The weather event model, location configuration, Open-Meteo HTTP client, and
+canonical event conversion are implemented and tested. The client supports
+one-shot raw captures, which can be exported as canonical JSON Lines events. Producer
 polling, canonical Kafka publishing, and weather storage remain implementation
 targets for Phase 3. They will use separate source and stream modules within the
 existing packages, with table definitions owned by `lakehouse`.
@@ -207,9 +208,9 @@ are `past_hours=3` and `forecast_hours=1`, covering the recent overlap and curre
 hour. Automatic model selection supplies the `forecast_best_match` dataset.
 The client verifies a zero UTC offset, a non-empty hourly time array, parameter
 arrays of matching length, and the expected source units. Raw ISO time labels have
-no offset suffix; the future producer must explicitly encode their UTC meaning as
-canonical timestamps. Source temperature and wind-direction unit symbols likewise
-need mapping to `degC` and `degree` before event validation.
+no offset suffix; `ingestion/weather_events.py` explicitly encodes their UTC meaning
+as canonical timestamps. It maps source temperature and wind-direction unit
+symbols to `degC` and `degree` before event validation.
 
 The HTTP defaults are a 30-second request timeout, at most four attempts, and
 exponential retry delays starting at one second. Connection errors, timeouts, and
@@ -221,9 +222,32 @@ The one-shot CLI selects a configured weather ID and creates an exclusive,
 timestamped snapshot under `data/weather/`. Captures include requested location
 metadata, source/dataset identity, the receipt timestamp, and the response with
 its returned grid coordinates. They preserve source evidence without advancing
-producer progress or Spark offsets. Snapshots are not canonical events and are
-not ready for direct Kafka replay. Weather publishing, overlap deduplication, and
+producer progress or Spark offsets. Snapshots are not canonical events and must
+be converted before Kafka replay. Weather publishing, overlap deduplication, and
 explicit date-range catch-up remain producer work.
+
+### Canonical Event Conversion
+
+`build_canonical_weather_events` in `ingestion/weather_events.py` converts an
+`HourlyWeatherResponse` and a `WeatherLocation` into six event payloads per retained
+hour. It revalidates the response envelope, accepts source time labels only in
+`YYYY-MM-DDTHH:00` format, rejects invalid dates and duplicate hours, and requires
+an explicitly UTC receipt timestamp. Hours after receipt time are excluded, not
+compared with the current wall clock. Requested coordinates come from location
+metadata; returned grid coordinates come from the source payload.
+
+The converter does not replace missing values or repair domain-invalid values.
+They remain available to `processing/weather_model.py` for validation and future
+quarantine routing. Missing grid coordinates likewise remain null. Conversion
+does not certify that an event is valid.
+
+The export CLI reads a raw capture with the supported source/dataset identity and
+uses its saved location metadata and receipt timestamp. It creates an exclusive
+`<capture-name>_canonical.jsonl` file under `data/weather/`. Repeating conversion
+with the same input yields identical events, even after configuration changes or
+at a later date. It does not fetch new data, publish to Kafka, deduplicate repeated
+responses, or advance any processing state. The weather contract and all existing
+OpenAQ tables and checkpoints remain unchanged; no migration is required.
 
 ### Weather Event Contract
 
