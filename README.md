@@ -319,6 +319,32 @@ never commits offsets, so its output can include earlier replays. No producer
 state or Spark checkpoints are changed. Automated polling, correction-aware
 deduplication, weather Spark sinks, and Iceberg storage remain planned.
 
+### Live Weather Ingestion
+
+With Kafka running and the weather topic created, fetch and publish one configured
+location directly without intermediate files:
+
+```bash
+python -m environmental_streaming.ingestion.weather_producer \
+  --weather-location-id munich
+```
+
+Use `stuttgart` or `hamburg` for another curated location, `--locations-file` for
+an alternative configuration, `--past-hours 6` for a larger recent overlap, and
+`--bootstrap-servers host:port` for another broker. The default requests the last
+three hours plus the current hour. The command reports the retained hour count,
+response-receipt time, topic, and confirmed delivered event count. Unknown IDs,
+source/conversion failures, and empty retained ranges fail before publishing.
+Delivery failures exit non-zero without a success report; some records may already
+have reached Kafka.
+
+Each execution makes a new API request and assigns a new receipt timestamp. No
+raw capture or producer progress file is written. Repeated calls can republish
+unchanged values at new offsets; there is no automatic polling or deduplication
+yet. Use the replay command for saved events whose original receipt timestamp
+must be retained. Missing values remain null for downstream validation. Existing
+OpenAQ state, Spark checkpoints, and lake data are unchanged.
+
 ## Verification
 
 ```bash
@@ -340,8 +366,9 @@ hourly model data with parameter-specific validation, explicit UTC timestamps, a
 invalid-event reasons while preserving input lineage. The Open-Meteo HTTP client
 supports raw source checks, and `ingestion/weather_events.py` converts responses
 and saved captures into canonical event payloads. Saved events can be replayed to
-the dedicated weather Kafka topic; automated polling and weather Iceberg storage
-are planned and do not run yet.
+the dedicated weather Kafka topic. The weather producer fetches and publishes
+fresh events in one live call. Automated polling and weather Iceberg storage are
+planned and do not run yet.
 
 [Weather location configuration](config/weather_locations.json) defines fixed city
 reference coordinates for Munich, Stuttgart, and Hamburg and maps the curated

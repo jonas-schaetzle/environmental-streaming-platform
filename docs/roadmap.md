@@ -78,6 +78,8 @@ Already delivered:
   captures, preserving receipt time and coordinates for deterministic replay
 - one-shot replay of saved weather events to a dedicated Kafka topic, with
   location keys, delivery-error checks, and offset-free diagnostic inspection
+- one-shot live Open-Meteo-to-Kafka ingestion for a configured location, composing
+  the existing client, canonical conversion, and confirmed-delivery publisher
 
 Next outcomes:
 
@@ -94,12 +96,12 @@ defines Open-Meteo hourly model data, a dedicated event contract, dataset-aware
 business identities, and correction and replay semantics. The weather contract,
 location configuration, HTTP client, canonical conversion, and their validation
 tests are implemented. Raw source checks, event exports, and explicit Kafka
-replay are available. Automated polling and weather ingestion into Iceberg
-remain planned.
+replay and direct live ingestion are available. Automated polling and weather
+ingestion into Iceberg remain planned.
 
 Deliver it in small, reviewable steps:
 
-1. Add the weather producer using the implemented Open-Meteo client, with
+1. Extend the one-shot weather producer with multi-location polling,
    per-location failure isolation, overlapping polls, correction-aware state,
    the implemented canonical event conversion, and verified delivery to
    `environment.weather.canonical`.
