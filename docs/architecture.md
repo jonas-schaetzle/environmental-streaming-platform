@@ -141,9 +141,11 @@ state, Spark checkpoints, Iceberg data, and downloaded measurements belong under
 The weather event model, location configuration, Open-Meteo HTTP client, and
 canonical event conversion are implemented and tested. The client supports
 one-shot raw captures, which can be exported as canonical JSON Lines events and
-explicitly replayed to Kafka. Producer polling and weather storage remain implementation
-targets for Phase 3. They will use separate source and stream modules within the
-existing packages, with table definitions owned by `lakehouse`.
+explicitly replayed to Kafka. One-shot live ingestion also connects the client,
+event conversion, and publisher without intermediate files. Automated polling and
+weather storage remain implementation targets for Phase 3. They will use separate
+source and stream modules within the existing packages, with table definitions
+owned by `lakehouse`.
 
 ### Source And Coverage
 
@@ -248,6 +250,22 @@ with the same input yields identical events, even after configuration changes or
 at a later date. It does not fetch new data, publish to Kafka, deduplicate repeated
 responses, or advance any processing state. The weather contract and all existing
 OpenAQ tables and checkpoints remain unchanged; no migration is required.
+
+### One-Shot Live Ingestion
+
+`ingestion/weather_producer.py` provides `publish_weather_location` and a CLI for
+one configured location per execution. It uses the existing HTTP retry policy,
+fully converts the response before publishing, rejects empty retained ranges, and
+reports success only after delivery checks complete. It retains nulls and other
+domain-invalid values for downstream validation rather than silently repairing
+them. Configuration and conversion failures do not publish records; delivery
+failures may leave a partially delivered batch.
+
+Live ingestion always makes a new fetch with a new receipt timestamp. Unlike
+saved-event replay, it does not preserve an earlier response revision. There is
+no multi-location loop, persistent producer state, or deduplication yet. Repeated
+manual calls may publish unchanged values at new Kafka offsets. No existing
+contracts, table identities, or checkpoint paths change; no migration is required.
 
 ### Weather Event Contract
 
