@@ -80,6 +80,8 @@ Already delivered:
   location keys, delivery-error checks, and offset-free diagnostic inspection
 - one-shot live Open-Meteo-to-Kafka ingestion for a configured location, composing
   the existing client, canonical conversion, and confirmed-delivery publisher
+- one-shot multi-location weather ingestion with per-location operational failure
+  isolation, coverage reporting, and a non-zero exit status for partial failures
 
 Next outcomes:
 
@@ -101,9 +103,9 @@ ingestion into Iceberg remain planned.
 
 Deliver it in small, reviewable steps:
 
-1. Extend the one-shot weather producer with multi-location polling,
-   per-location failure isolation, overlapping polls, correction-aware state,
-   the implemented canonical event conversion, and verified delivery to
+1. Extend the multi-location weather producer with continuous overlapping polls
+   and correction-aware persistent state, using the implemented canonical event
+   conversion and delivery checks for
    `environment.weather.canonical`.
 2. Add separate weather Spark queries and Iceberg tables with Kafka lineage,
    newest-response business-key upserts, quarantine, and dedicated checkpoints.

@@ -254,16 +254,25 @@ OpenAQ tables and checkpoints remain unchanged; no migration is required.
 ### One-Shot Live Ingestion
 
 `ingestion/weather_producer.py` provides `publish_weather_location` and a CLI for
-one configured location per execution. It uses the existing HTTP retry policy,
-fully converts the response before publishing, rejects empty retained ranges, and
+one configured location or all configured locations per execution. It uses the
+existing HTTP retry policy, fully converts the response before publishing,
+rejects empty retained ranges, and
 reports success only after delivery checks complete. It retains nulls and other
 domain-invalid values for downstream validation rather than silently repairing
 them. Configuration and conversion failures do not publish records; delivery
 failures may leave a partially delivered batch.
 
+`publish_weather_locations` processes locations sequentially and isolates expected
+HTTP, conversion, and Kafka delivery/queue failures. Its report lists successful
+location reports and errors separately; its delivered total includes only
+confirmed successful batches, not partial deliveries at failed locations. The
+`--all-locations` CLI prints this report and exits 1 if any location failed.
+Unexpected exception types propagate. The existing single-location CLI and report
+shape remain unchanged, and location configuration is validated before the run.
+
 Live ingestion always makes a new fetch with a new receipt timestamp. Unlike
 saved-event replay, it does not preserve an earlier response revision. There is
-no multi-location loop, persistent producer state, or deduplication yet. Repeated
+no continuous polling, persistent producer state, or deduplication yet. Repeated
 manual calls may publish unchanged values at new Kafka offsets. No existing
 contracts, table identities, or checkpoint paths change; no migration is required.
 

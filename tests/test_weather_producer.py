@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 import requests
+from confluent_kafka import KafkaException
 
 from environmental_streaming.ingestion import weather_producer
 from environmental_streaming.ingestion.weather_client import (
@@ -94,6 +95,107 @@ def test_source_or_conversion_failures_never_publish(
         fetch.return_value = response
         with pytest.raises(ValueError):
             weather_producer.publish_weather_location(LOCATION)
+    publish.assert_not_called()
+
+
+def test_multi_location_isolates_operational_failures_and_counts_only_confirmed_batches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    locations = (
+        LOCATION,
+        WeatherLocation("stuttgart", "Stuttgart", 48.78, 9.18, (2936,)),
+        WeatherLocation("hamburg", "Hamburg", 53.55, 9.99, (3071,)),
+    )
+    publish = Mock()
+    monkeypatch.setattr(weather_producer, "publish_weather_location", publish)
+    for failure in (
+        requests.Timeout("source unavailable"),
+        ValueError("bad response"),
+        RuntimeError("delivery failed"),
+        KafkaException("broker unavailable"),
+        BufferError("queue full"),
+    ):
+        publish.reset_mock()
+        publish.side_effect = [
+            {"weather_location_id": "munich", "delivered_count": 24},
+            failure,
+            {"weather_location_id": "hamburg", "delivered_count": 18},
+        ]
+        report = weather_producer.publish_weather_locations(locations, 6, "test:9092")
+        assert [call.args[0] for call in publish.call_args_list] == list(locations)
+        assert all(
+            call.kwargs == {"past_hours": 6, "bootstrap_servers": "test:9092"}
+            for call in publish.call_args_list
+        )
+        assert report["locations_total"] == 3
+        assert report["locations_succeeded"] == 2
+        assert report["locations_failed"] == 1
+        assert report["delivered_count"] == 42
+        assert [item["weather_location_id"] for item in report["locations"]] == [
+            "munich",
+            "hamburg",
+        ]
+        assert report["errors"] == [
+            {
+                "weather_location_id": "stuttgart",
+                "error_type": type(failure).__name__,
+                "error": str(failure),
+            }
+        ]
+    publish.side_effect = requests.Timeout("all unavailable")
+    report = weather_producer.publish_weather_locations(locations)
+    assert report["locations_failed"] == 3
+    assert report["locations_succeeded"] == report["delivered_count"] == 0
+    publish.reset_mock()
+    with pytest.raises(ValueError, match="At least one"):
+        weather_producer.publish_weather_locations(())
+    publish.assert_not_called()
+    publish.side_effect = TypeError("programming error")
+    with pytest.raises(TypeError, match="programming error"):
+        weather_producer.publish_weather_locations(locations)
+
+
+def test_all_locations_command_reports_success_and_partial_failure_and_rejects_conflicting_selection(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    load = Mock(return_value=(LOCATION,))
+    publish = Mock(
+        return_value={"weather_location_id": "munich", "delivered_count": 24}
+    )
+    monkeypatch.setattr(weather_producer, "load_weather_locations", load)
+    monkeypatch.setattr(weather_producer, "publish_weather_location", publish)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "weather_producer",
+            "--all-locations",
+            "--past-hours",
+            "6",
+            "--bootstrap-servers",
+            "test:9092",
+        ],
+    )
+    weather_producer.main()
+    publish.assert_called_once_with(
+        LOCATION, past_hours=6, bootstrap_servers="test:9092"
+    )
+    report = json.loads(capsys.readouterr().out)
+    assert report["locations_succeeded"] == 1
+    assert report["locations_failed"] == 0
+    assert report["delivered_count"] == 24
+    publish.side_effect = RuntimeError("partial delivery possible")
+    with pytest.raises(SystemExit) as error:
+        weather_producer.main()
+    assert error.value.code == 1
+    assert json.loads(capsys.readouterr().out)["locations_failed"] == 1
+    load.reset_mock()
+    publish.reset_mock()
+    for arguments in ([], ["--all-locations", "--weather-location-id", "munich"]):
+        monkeypatch.setattr("sys.argv", ["weather_producer", *arguments])
+        with pytest.raises(SystemExit) as error:
+            weather_producer.main()
+        assert error.value.code == 2
+    load.assert_not_called()
     publish.assert_not_called()
 
 
