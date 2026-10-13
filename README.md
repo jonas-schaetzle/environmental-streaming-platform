@@ -338,6 +338,21 @@ source/conversion failures, and empty retained ranges fail before publishing.
 Delivery failures exit non-zero without a success report; some records may already
 have reached Kafka.
 
+Fetch all configured locations in one sequential run:
+
+```bash
+python -m environmental_streaming.ingestion.weather_producer --all-locations
+```
+
+`--all-locations` and `--weather-location-id` are mutually exclusive. Multi-location
+runs continue after an operational failure at one location and emit a JSON summary
+with per-location successes and errors. Exit code 0 means all locations succeeded;
+exit code 1 means at least one failed. `delivered_count` sums only confirmed
+successful batches; failed batches can already have partially reached Kafka and
+are not counted. Unexpected exception types propagate rather than becoming
+location errors.
+The same overlap, broker, and location-file options apply to every location.
+
 Each execution makes a new API request and assigns a new receipt timestamp. No
 raw capture or producer progress file is written. Repeated calls can republish
 unchanged values at new offsets; there is no automatic polling or deduplication
