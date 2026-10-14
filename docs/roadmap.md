@@ -82,6 +82,8 @@ Already delivered:
   the existing client, canonical conversion, and confirmed-delivery publisher
 - one-shot multi-location weather ingestion with per-location operational failure
   isolation, coverage reporting, and a non-zero exit status for partial failures
+- opt-in restart-safe weather deduplication using destination-bound content
+  fingerprints, correction-aware publishing, and bounded per-location retention
 
 Next outcomes:
 
@@ -103,9 +105,9 @@ ingestion into Iceberg remain planned.
 
 Deliver it in small, reviewable steps:
 
-1. Extend the multi-location weather producer with continuous overlapping polls
-   and correction-aware persistent state, using the implemented canonical event
-   conversion and delivery checks for
+1. Extend the stateful multi-location weather producer with continuous overlapping
+   polls using the implemented correction-aware state, canonical event conversion,
+   and delivery checks for
    `environment.weather.canonical`.
 2. Add separate weather Spark queries and Iceberg tables with Kafka lineage,
    newest-response business-key upserts, quarantine, and dedicated checkpoints.

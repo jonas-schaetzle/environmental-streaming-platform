@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -96,6 +96,148 @@ def test_source_or_conversion_failures_never_publish(
         with pytest.raises(ValueError):
             weather_producer.publish_weather_location(LOCATION)
     publish.assert_not_called()
+
+
+def test_state_survives_restart_suppresses_receipt_only_changes_and_publishes_corrections(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    path = tmp_path / "data" / "state" / "weather.json"
+    response = _response()
+    fetch = Mock(return_value=response)
+    publish = Mock(side_effect=lambda events, **_: len(events))
+    monkeypatch.setattr(weather_producer, "fetch_hourly_weather", fetch)
+    monkeypatch.setattr(weather_producer, "produce_weather_events", publish)
+    first = weather_producer.publish_weather_location(LOCATION, state_path=path)
+    assert first["delivered_count"] == 6 and first["skipped_count"] == 0
+    original = path.read_text()
+    response = HourlyWeatherResponse(response.payload, FETCHED + timedelta(minutes=1))
+    fetch.return_value = response
+    publish.reset_mock()
+    second = weather_producer.publish_weather_location(LOCATION, state_path=path)
+    assert second["delivered_count"] == 0 and second["skipped_count"] == 6
+    assert second["fetched_at_utc"] == response.fetched_at_utc.isoformat()
+    assert path.read_text() == original
+    publish.assert_not_called()
+    response.payload["hourly"]["temperature_2m"][0] = -5.0
+    third = weather_producer.publish_weather_location(LOCATION, state_path=path)
+    assert third["delivered_count"] == 1 and third["skipped_count"] == 5
+    assert publish.call_args.args[0][0]["value"] == -5.0
+    assert (
+        publish.call_args.args[0][0]["fetched_at_utc"]
+        == response.fetched_at_utc.isoformat()
+    )
+    response.payload["hourly"]["time"] = ["2026-10-09T11:00", "2026-10-09T12:00"]
+    fetch.return_value = HourlyWeatherResponse(
+        response.payload, FETCHED + timedelta(hours=3)
+    )
+    later = weather_producer.publish_weather_location(LOCATION, state_path=path)
+    assert later["delivered_count"] == 12
+    state = weather_producer.load_weather_state(path, "localhost:9092")
+    keys = state["locations"]["munich"]
+    assert len(keys) == 12
+    assert all("T10:00" not in key for key in keys)
+
+
+def test_delivery_and_atomic_write_failures_leave_existing_state_unchanged(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    path = tmp_path / "weather.json"
+    response = _response()
+    fetch = Mock(return_value=response)
+    publish = Mock(side_effect=lambda events, **_: len(events))
+    monkeypatch.setattr(weather_producer, "fetch_hourly_weather", fetch)
+    monkeypatch.setattr(weather_producer, "produce_weather_events", publish)
+    weather_producer.publish_weather_location(LOCATION, state_path=path)
+    original = path.read_text()
+    response.payload["hourly"]["wind_speed_10m"][0] = 4.0
+    publish.side_effect = RuntimeError("partial delivery")
+    with pytest.raises(RuntimeError, match="partial delivery"):
+        weather_producer.publish_weather_location(LOCATION, state_path=path)
+    assert path.read_text() == original
+    missing_path = tmp_path / "never-confirmed.json"
+    with pytest.raises(RuntimeError):
+        weather_producer.publish_weather_location(LOCATION, state_path=missing_path)
+    assert not missing_path.exists()
+    publish.side_effect = None
+    publish.return_value = 0
+    with pytest.raises(RuntimeError, match="delivery count"):
+        weather_producer.publish_weather_location(LOCATION, state_path=path)
+    assert path.read_text() == original
+    publish.return_value = 1
+    monkeypatch.setattr(
+        weather_producer.os, "replace", Mock(side_effect=OSError("disk failure"))
+    )
+    with pytest.raises(OSError, match="disk failure"):
+        weather_producer.publish_weather_location(LOCATION, state_path=path)
+    assert path.read_text() == original
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_invalid_or_wrong_destination_state_fails_closed_before_fetch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    path = tmp_path / "weather.json"
+    good = weather_producer.load_weather_state(path, "localhost:9092")
+    bad_states = [
+        None,
+        [],
+        {},
+        {**good, "version": True},
+        {**good, "version": 2},
+        {**good, "topic": "other"},
+        {**good, "bootstrap_servers": "other:9092"},
+        {**good, "locations": []},
+        {**good, "locations": {"munich": []}},
+        {**good, "locations": {"munich": {"invalid key": "0" * 64}}},
+        {**good, "locations": {"munich": {"[]": "bad fingerprint"}}},
+    ]
+    fetch = Mock()
+    monkeypatch.setattr(weather_producer, "fetch_hourly_weather", fetch)
+    for raw in ["invalid JSON", *(json.dumps(state) for state in bad_states)]:
+        path.write_text(raw)
+        with pytest.raises(ValueError):
+            weather_producer.publish_weather_locations((LOCATION,), state_path=path)
+        assert path.read_text() == raw
+    fetch.assert_not_called()
+
+
+def test_stateful_multi_location_cli_commits_successes_independently(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    locations = (
+        LOCATION,
+        WeatherLocation("stuttgart", "Stuttgart", 48.78, 9.18, (2936,)),
+        WeatherLocation("hamburg", "Hamburg", 53.55, 9.99, (3071,)),
+    )
+    path = tmp_path / "weather.json"
+    monkeypatch.setattr(weather_producer, "load_weather_locations", lambda _: locations)
+    fetch = Mock(
+        side_effect=[_response(), requests.Timeout("unavailable"), _response()]
+    )
+    publish = Mock(side_effect=lambda events, **_: len(events))
+    monkeypatch.setattr(weather_producer, "fetch_hourly_weather", fetch)
+    monkeypatch.setattr(weather_producer, "produce_weather_events", publish)
+    monkeypatch.setattr(
+        "sys.argv", ["weather_producer", "--all-locations", "--state-path", str(path)]
+    )
+    with pytest.raises(SystemExit) as error:
+        weather_producer.main()
+    assert error.value.code == 1
+    report = json.loads(capsys.readouterr().out)
+    assert report["delivered_count"] == 12
+    assert report["locations_failed"] == 1
+    assert set(
+        weather_producer.load_weather_state(path, "localhost:9092")["locations"]
+    ) == {"munich", "hamburg"}
+    fetch.side_effect = None
+    fetch.return_value = _response()
+    weather_producer.main()
+    report = json.loads(capsys.readouterr().out)
+    assert report["locations_failed"] == 0
+    assert report["delivered_count"] == 6 and report["skipped_count"] == 12
+    assert set(
+        weather_producer.load_weather_state(path, "localhost:9092")["locations"]
+    ) == {"munich", "stuttgart", "hamburg"}
 
 
 def test_multi_location_isolates_operational_failures_and_counts_only_confirmed_batches(

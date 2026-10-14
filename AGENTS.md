@@ -26,7 +26,7 @@
   of saved canonical weather events without changing their receipt timestamps.
 - `src/environmental_streaming/ingestion/weather_producer.py` owns one-shot live
   weather ingestion through the client to Kafka, including per-location failure
-  isolation in multi-location runs.
+  isolation and opt-in correction-aware fingerprint state.
 - `src/environmental_streaming/messaging/kafka_publisher.py` owns event
   serialization, Kafka keys, and delivery checks.
 - `src/environmental_streaming/processing/measurement_model.py` owns the canonical
