@@ -354,11 +354,34 @@ location errors.
 The same overlap, broker, and location-file options apply to every location.
 
 Each execution makes a new API request and assigns a new receipt timestamp. No
-raw capture or producer progress file is written. Repeated calls can republish
-unchanged values at new offsets; there is no automatic polling or deduplication
-yet. Use the replay command for saved events whose original receipt timestamp
+raw capture is written. Without a state path, repeated calls can republish
+unchanged values at new offsets. There is no automatic polling yet.
+Use the replay command for saved events whose original receipt timestamp
 must be retained. Missing values remain null for downstream validation. Existing
 OpenAQ state, Spark checkpoints, and lake data are unchanged.
+
+Enable restart-safe, correction-aware deduplication explicitly:
+
+```bash
+python -m environmental_streaming.ingestion.weather_producer --all-locations \
+  --state-path data/state/weather_kafka_producer.json
+```
+
+Content fingerprints exclude only `fetched_at_utc`: unchanged events are skipped,
+but changed values or metadata for a known hour are sent again. `skipped_count`
+is included only in stateful reports. State is atomically replaced after confirmed
+delivery for each successful location, retaining that location's current response
+range. Failed locations retain their previous state; persistence failures stop the
+run. Corrupt, unsupported, or wrong-broker/topic state fails before fetching data.
+Use only one active process per state path, and keep state under `data/state/`.
+Use a separate state path for another Kafka destination. A missing state file
+publishes the whole first response; it does not infer progress from Kafka history.
+
+A crash after delivery but before saving state can still produce duplicates.
+Hours outside the retained range can be republished on a later expanded request;
+this is bounded overlap deduplication, not a permanent history or exactly-once
+guarantee. Weather Iceberg business-key upserts are still planned. Do not delete
+state to force replay; use the explicit saved-event replay command instead.
 
 ## Verification
 

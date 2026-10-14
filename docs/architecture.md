@@ -272,9 +272,10 @@ shape remain unchanged, and location configuration is validated before the run.
 
 Live ingestion always makes a new fetch with a new receipt timestamp. Unlike
 saved-event replay, it does not preserve an earlier response revision. There is
-no continuous polling, persistent producer state, or deduplication yet. Repeated
-manual calls may publish unchanged values at new Kafka offsets. No existing
-contracts, table identities, or checkpoint paths change; no migration is required.
+no continuous polling yet. By default, repeated manual calls may publish unchanged
+values at new Kafka offsets; an explicit `--state-path` enables fingerprint state.
+No existing contracts, table identities, or checkpoint paths change; no migration
+is required.
 
 ### Weather Event Contract
 
@@ -386,6 +387,28 @@ fingerprint per business key after confirmed Kafka delivery; exclude
 Republish changed values even when their event time has already been seen.
 Keep producer state under `data/state/` and fingerprint retention bounded to the
 active polling range. A timestamp-only high-water mark would suppress corrections.
+
+The one-shot live producer implements this policy when `--state-path` is supplied.
+Version-1 state records the Kafka bootstrap-server string and topic, plus SHA-256
+content fingerprints per dataset-aware business key and weather location. Content
+uses sorted JSON and excludes only the receipt timestamp. Changes in source
+numeric representation or any other metadata may therefore also trigger delivery.
+State is validated before a run; destination mismatches, unsupported versions,
+and corrupt structures are rejected without resetting progress. A new state file
+starts without any knowledge of previously published Kafka records.
+
+Each successful location replaces only its own active response range after all
+pending events are confirmed, preserving other locations and failed-location
+progress. Unchanged responses skip Kafka publishing. Temporary files are flushed
+and fsynced before atomic replacement; a write failure propagates without a
+success report. Use one active producer process per state path. Concurrent writers
+and shared-state use across different Kafka destinations are unsupported.
+
+The default stateless CLI and report remain compatible; stateful reports add
+`skipped_count`. Saved-event replay bypasses producer state and preserves original
+receipt times. No OpenAQ state, table identity, or checkpoint migration is needed.
+Extending the request beyond the retained range may republish older keys. Continuous
+polling, historical catch-up, and weather sinks remain separate work.
 
 A crash after Kafka delivery but before state persistence can produce a duplicate;
 the sink's business key handles it. Replay saved events with their original fetch
