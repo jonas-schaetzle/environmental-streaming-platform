@@ -142,10 +142,9 @@ The weather event model, location configuration, Open-Meteo HTTP client, and
 canonical event conversion are implemented and tested. The client supports
 one-shot raw captures, which can be exported as canonical JSON Lines events and
 explicitly replayed to Kafka. One-shot live ingestion also connects the client,
-event conversion, and publisher without intermediate files. Automated polling and
-weather storage remain implementation targets for Phase 3. They will use separate
-source and stream modules within the existing packages, with table definitions
-owned by `lakehouse`.
+event conversion, and publisher without intermediate files. Stateful fixed-delay
+polling is implemented. Weather storage remains an implementation target for
+Phase 3, with separate stream modules and table definitions owned by `lakehouse`.
 
 ### Source And Coverage
 
@@ -272,8 +271,9 @@ shape remain unchanged, and location configuration is validated before the run.
 
 Live ingestion always makes a new fetch with a new receipt timestamp. Unlike
 saved-event replay, it does not preserve an earlier response revision. There is
-no continuous polling yet. By default, repeated manual calls may publish unchanged
-values at new Kafka offsets; an explicit `--state-path` enables fingerprint state.
+an opt-in polling loop with per-location failure isolation. By default, repeated
+manual calls may publish unchanged values at new Kafka offsets; an explicit
+`--state-path` enables fingerprint state.
 No existing contracts, table identities, or checkpoint paths change; no migration
 is required.
 
@@ -388,7 +388,7 @@ Republish changed values even when their event time has already been seen.
 Keep producer state under `data/state/` and fingerprint retention bounded to the
 active polling range. A timestamp-only high-water mark would suppress corrections.
 
-The one-shot live producer implements this policy when `--state-path` is supplied.
+The live producer implements this policy when `--state-path` is supplied.
 Version-1 state records the Kafka bootstrap-server string and topic, plus SHA-256
 content fingerprints per dataset-aware business key and weather location. Content
 uses sorted JSON and excludes only the receipt timestamp. Changes in source
@@ -407,8 +407,20 @@ and shared-state use across different Kafka destinations are unsupported.
 The default stateless CLI and report remain compatible; stateful reports add
 `skipped_count`. Saved-event replay bypasses producer state and preserves original
 receipt times. No OpenAQ state, table identity, or checkpoint migration is needed.
-Extending the request beyond the retained range may republish older keys. Continuous
-polling, historical catch-up, and weather sinks remain separate work.
+Extending the request beyond the retained range may republish older keys.
+
+`run_weather_polling` repeats the existing multi-location cycle for one or all
+configured locations. Positive `--poll-interval-seconds` requires an explicit
+state path and uses fixed delay after each completed cycle, not overlapping or
+fixed-rate scheduling. Location configuration is loaded once at startup.
+`--max-cycles` optionally bounds execution. Each cycle
+flushes its JSON report and adds a cycle number; a bounded run remembers failures
+across cycles and exits non-zero even after recovery. No sleep follows its last
+cycle. HTTP/conversion/Kafka location failures can recover in the next cycle,
+whereas invalid state and persistence errors terminate the loop. Ctrl+C exits 130;
+previously committed progress remains intact, with the documented duplicate risk
+for interruption between delivery and state persistence. State version 1 remains
+compatible. Historical catch-up and weather sinks remain separate work.
 
 A crash after Kafka delivery but before state persistence can produce a duplicate;
 the sink's business key handles it. Replay saved events with their original fetch

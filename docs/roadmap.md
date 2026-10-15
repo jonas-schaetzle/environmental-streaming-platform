@@ -84,6 +84,8 @@ Already delivered:
   isolation, coverage reporting, and a non-zero exit status for partial failures
 - opt-in restart-safe weather deduplication using destination-bound content
   fingerprints, correction-aware publishing, and bounded per-location retention
+- stateful weather polling with fixed-delay pacing, optional cycle limits,
+  per-cycle reports, and recovery from operational location failures
 
 Next outcomes:
 
@@ -100,18 +102,14 @@ defines Open-Meteo hourly model data, a dedicated event contract, dataset-aware
 business identities, and correction and replay semantics. The weather contract,
 location configuration, HTTP client, canonical conversion, and their validation
 tests are implemented. Raw source checks, event exports, and explicit Kafka
-replay and direct live ingestion are available. Automated polling and weather
-ingestion into Iceberg remain planned.
+replay, direct live ingestion, and stateful polling are available. Weather
+ingestion into Iceberg remains planned.
 
 Deliver it in small, reviewable steps:
 
-1. Extend the stateful multi-location weather producer with continuous overlapping
-   polls using the implemented correction-aware state, canonical event conversion,
-   and delivery checks for
-   `environment.weather.canonical`.
-2. Add separate weather Spark queries and Iceberg tables with Kafka lineage,
+1. Add separate weather Spark queries and Iceberg tables with Kafka lineage,
    newest-response business-key upserts, quarantine, and dedicated checkpoints.
-3. Verify the real source-to-Kafka-to-Iceberg path, restart behavior, replay with
+2. Verify the real source-to-Kafka-to-Iceberg path, restart behavior, replay with
    new Kafka offsets, changed values for the same hour, out-of-order responses,
    and explicit catch-up after a polling gap. Extend read-only table auditing and
    document the operating commands in the README.
