@@ -316,8 +316,8 @@ or retrying after partial delivery, can create new Kafka offsets for the same
 business keys. Keys group events by location; they do not deduplicate records.
 The diagnostic reader starts at the earliest available offsets for its group and
 never commits offsets, so its output can include earlier replays. No producer
-state or Spark checkpoints are changed. Automated polling, correction-aware
-deduplication, weather Spark sinks, and Iceberg storage remain planned.
+state or Spark checkpoints are changed. Weather Spark sinks and Iceberg storage
+remain planned; stateful live polling is described below.
 
 ### Live Weather Ingestion
 
@@ -355,7 +355,7 @@ The same overlap, broker, and location-file options apply to every location.
 
 Each execution makes a new API request and assigns a new receipt timestamp. No
 raw capture is written. Without a state path, repeated calls can republish
-unchanged values at new offsets. There is no automatic polling yet.
+unchanged values at new offsets. Automatic polling must be enabled explicitly.
 Use the replay command for saved events whose original receipt timestamp
 must be retained. Missing values remain null for downstream validation. Existing
 OpenAQ state, Spark checkpoints, and lake data are unchanged.
@@ -383,6 +383,30 @@ this is bounded overlap deduplication, not a permanent history or exactly-once
 guarantee. Weather Iceberg business-key upserts are still planned. Do not delete
 state to force replay; use the explicit saved-event replay command instead.
 
+### Weather Polling
+
+Poll all configured locations with a five-minute delay after each completed cycle:
+
+```bash
+python -m environmental_streaming.ingestion.weather_producer --all-locations \
+  --state-path data/state/weather_kafka_producer.json --poll-interval-seconds 300
+```
+
+Use `--weather-location-id munich` instead of `--all-locations` for a single
+location, or add `--max-cycles 2` for a bounded run. Zero interval (the default)
+keeps the existing one-shot behavior; positive intervals require `--state-path`.
+The polling command prints and flushes one JSON report per cycle, including its
+cycle number. It waits only between cycles, never after the final bounded cycle.
+Actual start-to-start time includes API/Kafka processing plus the configured delay.
+
+Operational location failures remain isolated and are retried in the next cycle
+using the existing HTTP retry policy. A bounded run exits 1 if any cycle had failed
+locations, even if a later cycle recovers; otherwise it exits 0. Invalid state and
+storage failures stop polling. Ctrl+C exits 130 without clearing progress. Use one
+active process per state path; overlapping writers are not supported. Existing
+state version, event contracts, and checkpoints are unchanged. This does not add
+historical catch-up beyond the configured recent overlap.
+
 ## Verification
 
 ```bash
@@ -405,8 +429,8 @@ invalid-event reasons while preserving input lineage. The Open-Meteo HTTP client
 supports raw source checks, and `ingestion/weather_events.py` converts responses
 and saved captures into canonical event payloads. Saved events can be replayed to
 the dedicated weather Kafka topic. The weather producer fetches and publishes
-fresh events in one live call. Automated polling and weather Iceberg storage are
-planned and do not run yet.
+fresh events in one live call or an explicitly enabled polling loop. Weather
+Iceberg storage is planned and does not run yet.
 
 [Weather location configuration](config/weather_locations.json) defines fixed city
 reference coordinates for Munich, Stuttgart, and Hamburg and maps the curated

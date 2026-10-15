@@ -75,6 +75,149 @@ def test_live_publish_connects_existing_conversion_and_confirmed_delivery(
     }
 
 
+def test_polling_paces_cycles_and_remembers_failures_after_recovery(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    order = []
+    path = tmp_path / "state.json"
+
+    def cycle(*args, **kwargs):
+        order.append("cycle")
+        return {"locations_failed": 1 if len(order) == 1 else 0}
+
+    publish = Mock(side_effect=cycle)
+    sleep = Mock(side_effect=lambda _: order.append("sleep"))
+    monkeypatch.setattr(weather_producer, "publish_weather_locations", publish)
+    monkeypatch.setattr(weather_producer.time, "sleep", sleep)
+    assert (
+        weather_producer.run_weather_polling(
+            (LOCATION,),
+            path,
+            5,
+            max_cycles=2,
+            past_hours=6,
+            bootstrap_servers="test:9092",
+        )
+        is True
+    )
+    assert order == ["cycle", "sleep", "cycle"]
+    sleep.assert_called_once_with(5)
+    assert publish.call_count == 2
+    publish.assert_called_with(
+        (LOCATION,), past_hours=6, bootstrap_servers="test:9092", state_path=path
+    )
+    reports = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert reports == [
+        {"locations_failed": 1, "cycle": 1},
+        {"locations_failed": 0, "cycle": 2},
+    ]
+    publish.side_effect = None
+    publish.return_value = {"locations_failed": 0}
+    sleep.reset_mock()
+    assert (
+        weather_producer.run_weather_polling((LOCATION,), path, 5, max_cycles=1)
+        is False
+    )
+    sleep.assert_not_called()
+
+
+def test_polling_cli_selects_locations_validates_settings_and_exits_for_failure_or_interrupt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    path = tmp_path / "state.json"
+    load = Mock(return_value=(LOCATION,))
+    run = Mock(return_value=False)
+    monkeypatch.setattr(weather_producer, "load_weather_locations", load)
+    monkeypatch.setattr(weather_producer, "run_weather_polling", run)
+    arguments = [
+        "weather_producer",
+        "--weather-location-id",
+        "munich",
+        "--state-path",
+        str(path),
+        "--poll-interval-seconds",
+        "5",
+        "--max-cycles",
+        "2",
+    ]
+    monkeypatch.setattr("sys.argv", arguments)
+    weather_producer.main()
+    run.assert_called_once_with(
+        (LOCATION,),
+        poll_interval_seconds=5,
+        max_cycles=2,
+        past_hours=3,
+        bootstrap_servers="localhost:9092",
+        state_path=path,
+    )
+    run.return_value = True
+    with pytest.raises(SystemExit) as error:
+        weather_producer.main()
+    assert error.value.code == 1
+    run.side_effect = KeyboardInterrupt
+    with pytest.raises(SystemExit) as error:
+        weather_producer.main()
+    assert error.value.code == 130
+    run.reset_mock()
+    load.reset_mock()
+    for options in (
+        ["--poll-interval-seconds", "nan"],
+        ["--poll-interval-seconds", "inf"],
+        ["--poll-interval-seconds", "-1"],
+        ["--poll-interval-seconds", "5"],
+        ["--max-cycles", "2"],
+        ["--max-cycles", "0"],
+        ["--past-hours", "0"],
+    ):
+        monkeypatch.setattr(
+            "sys.argv", ["weather_producer", "--all-locations", *options]
+        )
+        with pytest.raises(SystemExit) as error:
+            weather_producer.main()
+        assert error.value.code == 2
+    load.assert_not_called()
+    run.assert_not_called()
+
+
+def test_polling_rejects_invalid_direct_settings_and_stops_on_fatal_errors_or_interrupt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    publish = Mock()
+    sleep = Mock()
+    path = tmp_path / "state.json"
+    monkeypatch.setattr(weather_producer, "publish_weather_locations", publish)
+    monkeypatch.setattr(weather_producer.time, "sleep", sleep)
+    for options in (
+        {"poll_interval_seconds": 0},
+        {"poll_interval_seconds": -1},
+        {"poll_interval_seconds": float("inf")},
+        {"poll_interval_seconds": float("nan")},
+        {"max_cycles": 0},
+        {"max_cycles": True},
+        {"max_cycles": 1.5},
+        {"past_hours": 0},
+        {"state_path": None},
+    ):
+        with pytest.raises(ValueError):
+            weather_producer.run_weather_polling(
+                (LOCATION,),
+                **{"state_path": path, "poll_interval_seconds": 5, **options},
+            )
+    publish.assert_not_called()
+    for failure in (OSError("cannot save state"), ValueError("invalid state")):
+        publish.side_effect = failure
+        with pytest.raises(type(failure)):
+            weather_producer.run_weather_polling((LOCATION,), path, 5)
+    sleep.assert_not_called()
+    publish.reset_mock()
+    publish.side_effect = None
+    publish.return_value = {"locations_failed": 0}
+    sleep.side_effect = KeyboardInterrupt
+    with pytest.raises(KeyboardInterrupt):
+        weather_producer.run_weather_polling((LOCATION,), path, 5)
+    publish.assert_called_once()
+
+
 def test_source_or_conversion_failures_never_publish(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
