@@ -143,8 +143,9 @@ canonical event conversion are implemented and tested. The client supports
 one-shot raw captures, which can be exported as canonical JSON Lines events and
 explicitly replayed to Kafka. One-shot live ingestion also connects the client,
 event conversion, and publisher without intermediate files. Stateful fixed-delay
-polling is implemented. Weather storage remains an implementation target for
-Phase 3, with separate stream modules and table definitions owned by `lakehouse`.
+polling and an Iceberg weather quarantine sink are implemented. Canonical weather
+storage remains an implementation target for Phase 3, with table definitions
+owned by `lakehouse`.
 
 ### Source And Coverage
 
@@ -181,9 +182,9 @@ not call OpenAQ to verify station existence or require every configured station
 to have weather coverage. A repository test checks that the curated files agree.
 
 Weather IDs identify fixed reference coordinates over time. Editing a city's
-reference point requires a new weather ID and an explicit mapping update, even
-though no weather processing state exists yet. Station mappings are static for
-now; changes after ingestion starts require a documented historical join policy.
+reference point requires a new weather ID and an explicit mapping update,
+regardless of processing state. Station mappings are static for now; changes
+after ingestion starts require a documented historical join policy.
 
 Request hourly data in UTC with explicit Celsius, metres-per-second, and millimetre
 settings. Initially publish only hours at or before the current UTC hour. Future
@@ -238,7 +239,7 @@ compared with the current wall clock. Requested coordinates come from location
 metadata; returned grid coordinates come from the source payload.
 
 The converter does not replace missing values or repair domain-invalid values.
-They remain available to `processing/weather_model.py` for validation and future
+They remain available to `processing/weather_model.py` for validation and
 quarantine routing. Missing grid coordinates likewise remain null. Conversion
 does not certify that an event is valid.
 
@@ -333,9 +334,10 @@ missing, invalid, or unsupported fields receive specific reasons. Raw payloads
 remain available even when parsing fails. Units must match the canonical units in
 the table; the model does not infer units or convert incompatible quantities.
 
-This model does not yet write quarantine records or connect to Kafka or Iceberg.
-It introduces a separate contract without changing the OpenAQ payload schema,
-existing checkpoints, or table identities.
+The pure model does not perform storage operations. `processing/weather_stream.py`
+connects its invalid route to Kafka and Iceberg quarantine. Canonical weather
+storage remains planned. The separate contract does not change the OpenAQ payload
+schema, existing checkpoints, or table identities.
 
 ### Kafka And Iceberg Identities
 
@@ -361,10 +363,26 @@ reader accepts a topic argument and never commits consumer offsets.
 No OpenAQ payload, Kafka identity, Iceberg schema, or checkpoint changes are
 introduced by this publishing extension; no data migration is required.
 
-| Planned table | Purpose | Merge identity | Hidden partition |
+| Weather table | Purpose | Merge identity | Hidden partition |
 |---|---|---|---|
-| `local.lake.canonical_weather_observations` | Latest accepted weather value per business key | Source, dataset, weather location, parameter, and `measured_at_utc` | Day of `measured_at_utc` |
-| `local.lake.quarantine_weather_observations` | Invalid weather events and Kafka lineage | Kafka topic, partition, and offset | Day of `kafka_timestamp` |
+| `local.lake.canonical_weather_observations` (planned) | Latest accepted weather value per business key | Source, dataset, weather location, parameter, and `measured_at_utc` | Day of `measured_at_utc` |
+| `local.lake.quarantine_weather_observations` (implemented) | Invalid weather events and Kafka lineage | Kafka topic, partition, and offset | Day of `kafka_timestamp` |
+
+`lakehouse/tables.py` creates the weather quarantine table independently of the
+OpenAQ tables, using Iceberg v2 and Parquet. All payload fields remain nullable so
+malformed input is retained. `processing/weather_stream.py` reads the dedicated
+Kafka topic, preserves its six trace fields, parses the weather contract, and
+writes only invalid rows through `foreachBatch` and insert-only `MERGE`. Incoming
+batches are reduced to unique Kafka identities before merging, and empty batches
+are skipped. Known offsets do not create duplicate rows, including when replayed
+through a different checkpoint. A new Kafka offset remains a new evidence record.
+
+The shared Kafka reader and generic Iceberg merge/write helpers are public in
+`measurement_stream.py`; their OpenAQ defaults and merge behavior are unchanged.
+The Spark factory accepts an application name without changing its defaults.
+Weather query orchestration stops Spark even on failure. No migration is needed
+for the existing OpenAQ warehouse or checkpoints. Weather table audit/maintenance
+integration and the canonical weather sink remain future work.
 
 The canonical business key survives republishing with new Kafka offsets. Insert
 new keys and update existing keys only when the incoming `fetched_at_utc` is newer.
@@ -420,7 +438,7 @@ cycle. HTTP/conversion/Kafka location failures can recover in the next cycle,
 whereas invalid state and persistence errors terminate the loop. Ctrl+C exits 130;
 previously committed progress remains intact, with the documented duplicate risk
 for interruption between delivery and state persistence. State version 1 remains
-compatible. Historical catch-up and weather sinks remain separate work.
+compatible. Historical catch-up and canonical weather storage remain separate work.
 
 A crash after Kafka delivery but before state persistence can produce a duplicate;
 the sink's business key handles it. Replay saved events with their original fetch
@@ -429,13 +447,18 @@ is not. Corrections outside the overlap and gaps after a longer outage require a
 explicit date-range catch-up within source availability; the overlap alone does not
 guarantee complete history.
 
-Weather canonical and quarantine queries will own separate checkpoints at
-`data/checkpoints/weather_canonical` and `data/checkpoints/weather_quarantine`.
-They initially follow the existing `availableNow` processing pattern. Existing
+The implemented weather quarantine query owns `data/checkpoints/weather_quarantine`
+and uses `availableNow`. The future canonical query will independently own
+`data/checkpoints/weather_canonical` and follow the same processing pattern. Existing
 checkpoints own continuation; only a new checkpoint starts at earliest offsets.
 Business-key merges also protect the canonical sink when republished events have
 new transport identities. Producer state, checkpoints, and lake data are never
 deleted to trigger replay.
+
+The quarantine query consumes valid records without storing them. Its checkpoint
+must never be reused for the canonical sink. Keep Kafka retention sufficient for
+the future canonical query to replay valid records from retained earliest offsets;
+quarantine progress alone does not preserve them.
 
 Use `measured_at_utc` for event-time alignment and `fetched_at_utc` for ingestion
 lineage. The initial weather sinks have no aggregation watermark and accept old

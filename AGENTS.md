@@ -34,7 +34,10 @@
 - `src/environmental_streaming/processing/weather_model.py` owns the weather
   contract, payload parsing, UTC validation, and quarantine reasons.
 - `src/environmental_streaming/processing/measurement_stream.py` owns Spark stream
-  orchestration, checkpoints, and valid, quarantine, and hourly aggregate sinks.
+  orchestration, checkpoints, valid, quarantine, and hourly aggregate sinks, and
+  reusable Kafka-read and Iceberg merge/write helpers.
+- `src/environmental_streaming/processing/weather_stream.py` owns weather Kafka
+  parsing and the dedicated Iceberg quarantine query and checkpoint.
 - `src/environmental_streaming/lakehouse/tables.py` owns Iceberg table identifiers,
   column contracts, and table creation.
 - `src/environmental_streaming/lakehouse/audit.py` owns read-only Iceberg
