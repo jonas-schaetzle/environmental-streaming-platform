@@ -305,7 +305,7 @@ python -m environmental_streaming.diagnostics.kafka_consumer \
 The replay command checks the entire file for JSON objects, supported
 source/dataset identities, non-empty location IDs, and the presence of both
 original timestamps before sending anything. It preserves the event payloads,
-including receipt times and invalid individual values for future quarantine.
+including receipt times and invalid individual values for downstream quarantine.
 Domain validation still belongs to the weather model. Records use the key
 `open_meteo:<weather_location_id>`; success is reported only after Kafka delivery
 callbacks complete without errors and no records remain queued within 30 seconds.
@@ -316,8 +316,8 @@ or retrying after partial delivery, can create new Kafka offsets for the same
 business keys. Keys group events by location; they do not deduplicate records.
 The diagnostic reader starts at the earliest available offsets for its group and
 never commits offsets, so its output can include earlier replays. No producer
-state or Spark checkpoints are changed. Weather Spark sinks and Iceberg storage
-remain planned; stateful live polling is described below.
+state or Spark checkpoints are changed. A weather quarantine sink is available
+below; canonical weather storage remains planned.
 
 ### Live Weather Ingestion
 
@@ -407,6 +407,32 @@ active process per state path; overlapping writers are not supported. Existing
 state version, event contracts, and checkpoints are unchanged. This does not add
 historical catch-up beyond the configured recent overlap.
 
+### Weather Quarantine
+
+Process all currently available weather Kafka records and store invalid events:
+
+```bash
+python -m environmental_streaming.processing.weather_stream
+```
+
+The `availableNow` query writes only invalid records to
+`local.lake.quarantine_weather_observations`, partitioned by Kafka timestamp day.
+Rows retain topic, partition, offset, Kafka timestamp, key, raw payload, parsed
+weather fields, and the validation reason. Reprocessing the same Kafka identity
+does not insert another row; republishing at a new offset is separate evidence.
+
+The dedicated checkpoint is `data/checkpoints/weather_quarantine`. Existing
+checkpoints determine continuation; only a new one starts at the earliest retained
+Kafka offsets. `--topic`, `--bootstrap-servers`, and `--checkpoint-path` support
+explicit diagnostic or replay runs. Never reuse an OpenAQ or future canonical
+weather checkpoint, and do not delete progress to force replay. No aggregation
+watermark is applied. Existing OpenAQ queries and tables are unchanged.
+
+Valid weather events are not stored by this query yet. The future canonical sink
+will use a separate checkpoint and latest-response business-key upserts. Preserve
+sufficient Kafka retention until that sink is deployed; quarantine progress does
+not guarantee retention of valid data. Weather table auditing remains planned.
+
 ## Verification
 
 ```bash
@@ -429,8 +455,9 @@ invalid-event reasons while preserving input lineage. The Open-Meteo HTTP client
 supports raw source checks, and `ingestion/weather_events.py` converts responses
 and saved captures into canonical event payloads. Saved events can be replayed to
 the dedicated weather Kafka topic. The weather producer fetches and publishes
-fresh events in one live call or an explicitly enabled polling loop. Weather
-Iceberg storage is planned and does not run yet.
+fresh events in one live call or an explicitly enabled polling loop. Invalid
+weather events can be stored in Iceberg quarantine; canonical weather storage
+remains planned.
 
 [Weather location configuration](config/weather_locations.json) defines fixed city
 reference coordinates for Munich, Stuttgart, and Hamburg and maps the curated
