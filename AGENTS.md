@@ -37,7 +37,8 @@
   orchestration, checkpoints, valid, quarantine, and hourly aggregate sinks, and
   reusable Kafka-read and Iceberg merge/write helpers.
 - `src/environmental_streaming/processing/weather_stream.py` owns weather Kafka
-  parsing and the dedicated Iceberg quarantine query and checkpoint.
+  parsing, newest-response canonical upserts and conflict detection, and the
+  separate Iceberg canonical/quarantine queries and checkpoints.
 - `src/environmental_streaming/lakehouse/tables.py` owns Iceberg table identifiers,
   column contracts, and table creation.
 - `src/environmental_streaming/lakehouse/audit.py` owns read-only Iceberg

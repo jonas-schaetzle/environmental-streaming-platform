@@ -317,7 +317,7 @@ business keys. Keys group events by location; they do not deduplicate records.
 The diagnostic reader starts at the earliest available offsets for its group and
 never commits offsets, so its output can include earlier replays. No producer
 state or Spark checkpoints are changed. A weather quarantine sink is available
-below; canonical weather storage remains planned.
+below; canonical weather storage is available through a separate sink.
 
 ### Live Weather Ingestion
 
@@ -380,8 +380,8 @@ publishes the whole first response; it does not infer progress from Kafka histor
 A crash after delivery but before saving state can still produce duplicates.
 Hours outside the retained range can be republished on a later expanded request;
 this is bounded overlap deduplication, not a permanent history or exactly-once
-guarantee. Weather Iceberg business-key upserts are still planned. Do not delete
-state to force replay; use the explicit saved-event replay command instead.
+guarantee. Weather Iceberg business-key upserts protect canonical storage. Do not
+delete state to force replay; use the explicit saved-event replay command instead.
 
 ### Weather Polling
 
@@ -424,14 +424,47 @@ does not insert another row; republishing at a new offset is separate evidence.
 The dedicated checkpoint is `data/checkpoints/weather_quarantine`. Existing
 checkpoints determine continuation; only a new one starts at the earliest retained
 Kafka offsets. `--topic`, `--bootstrap-servers`, and `--checkpoint-path` support
-explicit diagnostic or replay runs. Never reuse an OpenAQ or future canonical
+explicit diagnostic or replay runs. Never reuse an OpenAQ or canonical
 weather checkpoint, and do not delete progress to force replay. No aggregation
 watermark is applied. Existing OpenAQ queries and tables are unchanged.
 
-Valid weather events are not stored by this query yet. The future canonical sink
-will use a separate checkpoint and latest-response business-key upserts. Preserve
-sufficient Kafka retention until that sink is deployed; quarantine progress does
-not guarantee retention of valid data. Weather table auditing remains planned.
+Valid weather events are not stored by this query. Run the separate canonical
+sink below as well. Quarantine progress does not guarantee retention of valid
+data; each sink needs sufficient Kafka retention to catch up independently.
+Weather table auditing remains planned.
+
+### Canonical Weather Storage
+
+Store valid weather values with a separate query and checkpoint:
+
+```bash
+python -m environmental_streaming.processing.weather_stream --sink canonical
+```
+
+The `availableNow` query writes `local.lake.canonical_weather_observations`,
+partitioned by day of `measured_at_utc`, and owns
+`data/checkpoints/weather_canonical`. The default command still runs quarantine.
+Do not share checkpoints between sinks. Both commands support the same explicit
+topic, broker, and checkpoint overrides and stop when available input is processed.
+
+The business key is source, dataset, weather location, parameter, and UTC hour.
+Within a batch, the newest `fetched_at_utc` wins. Existing rows update only for
+a strictly newer receipt; older and identical replays leave the accepted value
+and its Kafka lineage unchanged, even at new offsets. The accepted raw payload
+and all Kafka metadata are retained. Required canonical payload fields are non-null.
+
+Different canonical content at the same key and receipt time fails the batch
+before writing, both within the incoming batch and against the currently stored
+revision. Formatting or Kafka lineage differences alone are not content conflicts.
+Historical revisions no longer in the latest-value table are not a permanent
+conflict ledger. Identical incoming ties choose the smallest topic/partition/offset.
+Use only one canonical writer per table. Resolve source conflicts explicitly;
+do not delete a checkpoint to skip a failed batch. Existing OpenAQ and quarantine
+tables/checkpoints are unchanged, and no schema migration is needed.
+
+Budget driver heap explicitly for notebooks or stress checks that run many queries
+in one Spark process; the multi-wave local check used 2 GB. The normal CLI runs
+one bounded `availableNow` query and was also verified with the existing defaults.
 
 ## Verification
 
@@ -456,8 +489,8 @@ supports raw source checks, and `ingestion/weather_events.py` converts responses
 and saved captures into canonical event payloads. Saved events can be replayed to
 the dedicated weather Kafka topic. The weather producer fetches and publishes
 fresh events in one live call or an explicitly enabled polling loop. Invalid
-weather events can be stored in Iceberg quarantine; canonical weather storage
-remains planned.
+weather events are stored in Iceberg quarantine; valid values use a separate
+latest-response canonical Iceberg sink.
 
 [Weather location configuration](config/weather_locations.json) defines fixed city
 reference coordinates for Munich, Stuttgart, and Hamburg and maps the curated

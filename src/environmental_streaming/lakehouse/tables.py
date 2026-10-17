@@ -8,6 +8,9 @@ ICEBERG_QUARANTINE_TABLE = f"{ICEBERG_NAMESPACE}.quarantine_measurements"
 ICEBERG_WEATHER_QUARANTINE_TABLE = (
     f"{ICEBERG_NAMESPACE}.quarantine_weather_observations"
 )
+ICEBERG_WEATHER_CANONICAL_TABLE = f"{ICEBERG_NAMESPACE}.canonical_weather_observations"
+WEATHER_CANONICAL_BATCH_VIEW = "iceberg_canonical_weather_batch"
+WEATHER_CANONICAL_CHECKPOINT_PATH = "data/checkpoints/weather_canonical"
 WEATHER_QUARANTINE_BATCH_VIEW = "iceberg_quarantine_weather_batch"
 WEATHER_QUARANTINE_CHECKPOINT_PATH = "data/checkpoints/weather_quarantine"
 ICEBERG_HOURLY_AGGREGATE_TABLE = (
@@ -76,6 +79,7 @@ QUARANTINE_WEATHER_COLUMNS = (
     "fetched_at_utc",
     "validation_error",
 )
+CANONICAL_WEATHER_COLUMNS = QUARANTINE_WEATHER_COLUMNS[:-1]
 HOURLY_AGGREGATE_COLUMNS = (
     "window_start",
     "window_end",
@@ -104,6 +108,38 @@ HOURLY_AGGREGATE_UPDATE_COLUMNS = (
     "maximum_value",
     "latest_measured_at_utc",
 )
+
+
+def ensure_weather_canonical_table(spark: SparkSession) -> None:
+    spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {ICEBERG_NAMESPACE}")
+    spark.sql(
+        f"""
+        CREATE TABLE IF NOT EXISTS {ICEBERG_WEATHER_CANONICAL_TABLE} (
+            kafka_topic STRING,
+            kafka_partition INT,
+            kafka_offset BIGINT,
+            kafka_timestamp TIMESTAMP,
+            kafka_key STRING,
+            raw_value STRING,
+            source STRING NOT NULL,
+            source_dataset STRING NOT NULL,
+            weather_location_id STRING NOT NULL,
+            city STRING NOT NULL,
+            latitude DOUBLE NOT NULL,
+            longitude DOUBLE NOT NULL,
+            grid_latitude DOUBLE NOT NULL,
+            grid_longitude DOUBLE NOT NULL,
+            parameter STRING NOT NULL,
+            value DOUBLE NOT NULL,
+            unit STRING NOT NULL,
+            measured_at_utc TIMESTAMP NOT NULL,
+            fetched_at_utc TIMESTAMP NOT NULL
+        )
+        USING iceberg
+        PARTITIONED BY (days(measured_at_utc))
+        TBLPROPERTIES ('format-version' = '2', 'write.format.default' = 'parquet')
+        """
+    )
 
 
 def ensure_weather_quarantine_table(spark: SparkSession) -> None:
