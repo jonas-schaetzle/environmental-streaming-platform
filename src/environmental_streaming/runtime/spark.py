@@ -29,11 +29,11 @@ ICEBERG_WAREHOUSE_PATH = str(
 )
 
 
-def create_spark_session() -> SparkSession:
+def create_spark_session(app_name: str = "measurement-kafka-stream") -> SparkSession:
     configure_java_runtime()
 
     return (
-        SparkSession.builder.appName("measurement-kafka-stream")
+        SparkSession.builder.appName(app_name)
         .master("local[*]")
         .config("spark.sql.shuffle.partitions", LOCAL_SHUFFLE_PARTITIONS)
         .config("spark.sql.session.timeZone", "UTC")

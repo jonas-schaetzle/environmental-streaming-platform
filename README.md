@@ -4,14 +4,14 @@
 
 Production-oriented streaming data platform for real environmental measurements.
 The current implementation continuously ingests OpenAQ data, publishes canonical
-measurement events to Kafka, validates them with Spark Structured Streaming, and
-separates usable data from quarantined records.
+measurement events to Kafka, processes them with Spark Structured Streaming, and
+stores canonical, quarantined, and hourly aggregate data in Apache Iceberg.
 
 ## Project Documentation
 
-- [Projektstand](docs/projektstand.md)
-- [Projektziel](docs/projektziel.md)
-- [Arbeitsweise](docs/arbeitsweise.md)
+- [Architecture](docs/architecture.md)
+- [Roadmap](docs/roadmap.md)
+- [Development Workflow](docs/development-workflow.md)
 
 ## Architecture
 
@@ -185,7 +185,7 @@ Inspect Kafka events without committing consumer offsets:
 python -m environmental_streaming.diagnostics.kafka_consumer
 ```
 
-Audit all Iceberg tables after a pipeline run or backfill:
+Audit the three OpenAQ Iceberg tables after a pipeline run or backfill:
 
 ```bash
 python -m environmental_streaming.lakehouse.audit
@@ -194,6 +194,9 @@ python -m environmental_streaming.lakehouse.audit
 The JSON report includes row and data-file counts, duplicate or incomplete identity
 keys, hidden partitioning, freshness timestamps, and snapshot metadata. The command
 returns a non-zero exit code when any table fails its identity or partition checks.
+Use `--source weather` for both weather tables, or `--source all` for all five
+tables. The default remains `--source openaq` so existing OpenAQ-only deployments
+do not require weather tables.
 
 Inspect small-file and snapshot maintenance needs without changing the tables:
 
@@ -246,6 +249,238 @@ All runtime state, checkpoints, and measurement outputs live under `data/` and a
 excluded from version control. Legacy Parquet outputs and checkpoints may remain
 there after the Iceberg cutover, but the pipeline no longer updates or deletes them.
 
+## Weather Source Check
+
+Capture hourly weather for one configured location using the public non-commercial
+Open-Meteo endpoint:
+
+```bash
+python -m environmental_streaming.ingestion.weather_client \
+  --weather-location-id munich
+```
+
+Use `stuttgart` or `hamburg` for the other curated locations. The command requires
+no OpenAQ key or running Kafka/Spark services. By default it requests the previous
+three hours plus the current hour, in UTC with Celsius, metres-per-second wind
+speed, and millimetre precipitation. Use `--past-hours 6` to expand the recent range
+or `--locations-file path/to/weather_locations.json` for another location file.
+
+Each successful capture creates a timestamped JSON file under `data/weather/` and
+prints a JSON report containing the location ID, fetch time, hour count, and file
+path. The snapshot preserves requested coordinates, station mappings, source and
+dataset labels, the UTC response-receipt time, and the decoded API response.
+Existing captures are never overwritten. Convert a saved capture into canonical
+JSON Lines events (replace the example filename with the reported capture path):
+
+```bash
+python -m environmental_streaming.ingestion.weather_events \
+  --capture-file "data/weather/open_meteo_<timestamp>.json"
+```
+
+The export creates `<capture-name>_canonical.jsonl` under `data/weather/` without
+overwriting existing files. Each line contains one parameter for one UTC hour,
+with canonical units, requested and returned grid coordinates, and the original
+receipt timestamp. Future hours relative to that timestamp are excluded. The
+export uses the saved location metadata, not today's location configuration.
+Missing or invalid individual values remain unchanged for downstream validation;
+an export is not a guarantee of valid data. Invalid time labels, duplicate hours,
+or broken response envelopes fail the conversion before a file is created.
+Neither command publishes to Kafka or changes producer state or checkpoints.
+
+### Weather Kafka Replay
+
+Start the local Kafka broker with `docker compose up -d` and create the separate
+weather topic once (existing topics are left intact):
+
+```bash
+docker exec environmental-streaming-kafka /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 --create --if-not-exists \
+  --topic environment.weather.canonical --partitions 3 --replication-factor 1
+
+python -m environmental_streaming.ingestion.weather_replay \
+  --events-file "data/weather/open_meteo_<timestamp>_canonical.jsonl"
+
+python -m environmental_streaming.diagnostics.kafka_consumer \
+  --topic environment.weather.canonical --max-messages 24 \
+  --group-id weather-replay-check
+```
+
+The replay command checks the entire file for JSON objects, supported
+source/dataset identities, non-empty location IDs, and the presence of both
+original timestamps before sending anything. It preserves the event payloads,
+including receipt times and invalid individual values for downstream quarantine.
+Domain validation still belongs to the weather model. Records use the key
+`open_meteo:<weather_location_id>`; success is reported only after Kafka delivery
+callbacks complete without errors and no records remain queued within 30 seconds.
+Use `--bootstrap-servers host:port` to publish to another broker.
+
+Replay is explicit and has no persistent deduplication state. Running it again,
+or retrying after partial delivery, can create new Kafka offsets for the same
+business keys. Keys group events by location; they do not deduplicate records.
+The diagnostic reader starts at the earliest available offsets for its group and
+never commits offsets, so its output can include earlier replays. No producer
+state or Spark checkpoints are changed. A weather quarantine sink is available
+below; canonical weather storage is available through a separate sink.
+
+### Live Weather Ingestion
+
+With Kafka running and the weather topic created, fetch and publish one configured
+location directly without intermediate files:
+
+```bash
+python -m environmental_streaming.ingestion.weather_producer \
+  --weather-location-id munich
+```
+
+Use `stuttgart` or `hamburg` for another curated location, `--locations-file` for
+an alternative configuration, `--past-hours 6` for a larger recent overlap, and
+`--bootstrap-servers host:port` for another broker. The default requests the last
+three hours plus the current hour. The command reports the retained hour count,
+response-receipt time, topic, and confirmed delivered event count. Unknown IDs,
+source/conversion failures, and empty retained ranges fail before publishing.
+Delivery failures exit non-zero without a success report; some records may already
+have reached Kafka.
+
+Fetch all configured locations in one sequential run:
+
+```bash
+python -m environmental_streaming.ingestion.weather_producer --all-locations
+```
+
+`--all-locations` and `--weather-location-id` are mutually exclusive. Multi-location
+runs continue after an operational failure at one location and emit a JSON summary
+with per-location successes and errors. Exit code 0 means all locations succeeded;
+exit code 1 means at least one failed. `delivered_count` sums only confirmed
+successful batches; failed batches can already have partially reached Kafka and
+are not counted. Unexpected exception types propagate rather than becoming
+location errors.
+The same overlap, broker, and location-file options apply to every location.
+
+Each execution makes a new API request and assigns a new receipt timestamp. No
+raw capture is written. Without a state path, repeated calls can republish
+unchanged values at new offsets. Automatic polling must be enabled explicitly.
+Use the replay command for saved events whose original receipt timestamp
+must be retained. Missing values remain null for downstream validation. Existing
+OpenAQ state, Spark checkpoints, and lake data are unchanged.
+
+Enable restart-safe, correction-aware deduplication explicitly:
+
+```bash
+python -m environmental_streaming.ingestion.weather_producer --all-locations \
+  --state-path data/state/weather_kafka_producer.json
+```
+
+Content fingerprints exclude only `fetched_at_utc`: unchanged events are skipped,
+but changed values or metadata for a known hour are sent again. `skipped_count`
+is included only in stateful reports. State is atomically replaced after confirmed
+delivery for each successful location, retaining that location's current response
+range. Failed locations retain their previous state; persistence failures stop the
+run. Corrupt, unsupported, or wrong-broker/topic state fails before fetching data.
+Use only one active process per state path, and keep state under `data/state/`.
+Use a separate state path for another Kafka destination. A missing state file
+publishes the whole first response; it does not infer progress from Kafka history.
+
+A crash after delivery but before saving state can still produce duplicates.
+Hours outside the retained range can be republished on a later expanded request;
+this is bounded overlap deduplication, not a permanent history or exactly-once
+guarantee. Weather Iceberg business-key upserts protect canonical storage. Do not
+delete state to force replay; use the explicit saved-event replay command instead.
+
+### Weather Polling
+
+Poll all configured locations with a five-minute delay after each completed cycle:
+
+```bash
+python -m environmental_streaming.ingestion.weather_producer --all-locations \
+  --state-path data/state/weather_kafka_producer.json --poll-interval-seconds 300
+```
+
+Use `--weather-location-id munich` instead of `--all-locations` for a single
+location, or add `--max-cycles 2` for a bounded run. Zero interval (the default)
+keeps the existing one-shot behavior; positive intervals require `--state-path`.
+The polling command prints and flushes one JSON report per cycle, including its
+cycle number. It waits only between cycles, never after the final bounded cycle.
+Actual start-to-start time includes API/Kafka processing plus the configured delay.
+
+Operational location failures remain isolated and are retried in the next cycle
+using the existing HTTP retry policy. A bounded run exits 1 if any cycle had failed
+locations, even if a later cycle recovers; otherwise it exits 0. Invalid state and
+storage failures stop polling. Ctrl+C exits 130 without clearing progress. Use one
+active process per state path; overlapping writers are not supported. Existing
+state version, event contracts, and checkpoints are unchanged. This does not add
+historical catch-up beyond the configured recent overlap.
+
+### Weather Quarantine
+
+Process all currently available weather Kafka records and store invalid events:
+
+```bash
+python -m environmental_streaming.processing.weather_stream
+```
+
+The `availableNow` query writes only invalid records to
+`local.lake.quarantine_weather_observations`, partitioned by Kafka timestamp day.
+Rows retain topic, partition, offset, Kafka timestamp, key, raw payload, parsed
+weather fields, and the validation reason. Reprocessing the same Kafka identity
+does not insert another row; republishing at a new offset is separate evidence.
+
+The dedicated checkpoint is `data/checkpoints/weather_quarantine`. Existing
+checkpoints determine continuation; only a new one starts at the earliest retained
+Kafka offsets. `--topic`, `--bootstrap-servers`, and `--checkpoint-path` support
+explicit diagnostic or replay runs. Never reuse an OpenAQ or canonical
+weather checkpoint, and do not delete progress to force replay. No aggregation
+watermark is applied. Existing OpenAQ queries and tables are unchanged.
+
+Valid weather events are not stored by this query. Run the separate canonical
+sink below as well. Quarantine progress does not guarantee retention of valid
+data; each sink needs sufficient Kafka retention to catch up independently.
+Both weather tables can be inspected without changing data or processing state:
+
+```bash
+python -m environmental_streaming.lakehouse.audit --source weather
+```
+
+Canonical uniqueness uses source, dataset, weather location, parameter, and UTC
+hour, not Kafka offsets; quarantine uniqueness uses topic, partition, and offset.
+The report includes incomplete identities, partitions, latest event/transport
+timestamps, files, and snapshots. Missing tables fail the command rather than
+being created or silently skipped. Run both sinks first, even if quarantine is
+empty. `healthy` means identity and partition checks passed; it does not certify
+coverage of every location/hour, freshness thresholds, or full payload validity.
+
+### Canonical Weather Storage
+
+Store valid weather values with a separate query and checkpoint:
+
+```bash
+python -m environmental_streaming.processing.weather_stream --sink canonical
+```
+
+The `availableNow` query writes `local.lake.canonical_weather_observations`,
+partitioned by day of `measured_at_utc`, and owns
+`data/checkpoints/weather_canonical`. The default command still runs quarantine.
+Do not share checkpoints between sinks. Both commands support the same explicit
+topic, broker, and checkpoint overrides and stop when available input is processed.
+
+The business key is source, dataset, weather location, parameter, and UTC hour.
+Within a batch, the newest `fetched_at_utc` wins. Existing rows update only for
+a strictly newer receipt; older and identical replays leave the accepted value
+and its Kafka lineage unchanged, even at new offsets. The accepted raw payload
+and all Kafka metadata are retained. Required canonical payload fields are non-null.
+
+Different canonical content at the same key and receipt time fails the batch
+before writing, both within the incoming batch and against the currently stored
+revision. Formatting or Kafka lineage differences alone are not content conflicts.
+Historical revisions no longer in the latest-value table are not a permanent
+conflict ledger. Identical incoming ties choose the smallest topic/partition/offset.
+Use only one canonical writer per table. Resolve source conflicts explicitly;
+do not delete a checkpoint to skip a failed batch. Existing OpenAQ and quarantine
+tables/checkpoints are unchanged, and no schema migration is needed.
+
+Budget driver heap explicitly for notebooks or stress checks that run many queries
+in one Spark process; the multi-wave local check used 2 GB. The normal CLI runs
+one bounded `availableNow` query and was also verified with the existing defaults.
+
 ## Verification
 
 ```bash
@@ -256,21 +491,31 @@ pytest
 GitHub Actions runs the same checks with Python 3.11 and Java 21 on pushes to
 `dev` and `main`, and on release pull requests targeting `main`.
 
-## Canonical Measurement Contract
+## Data Model
 
-- `source`: source system, currently `openaq`
-- `location_id`: source-specific location identifier
-- `sensor_id`: source-specific sensor identifier
-- `parameter`: measured quantity such as `pm25`, `no2`, or `o3`
-- `parameter_display_name`: human-readable parameter name
-- `value`: numeric measurement value
-- `unit`: normalized measurement unit
-- `measured_at_utc`: event timestamp in UTC
-- `latitude`: measurement latitude
-- `longitude`: measurement longitude
+The canonical event contract, Kafka trace fields, Iceberg merge identities,
+partitioning, and state semantics are documented in
+[Architecture](docs/architecture.md).
+
+The weather model in `processing/weather_model.py` provides a tested contract for
+hourly model data with parameter-specific validation, explicit UTC timestamps, and
+invalid-event reasons while preserving input lineage. The Open-Meteo HTTP client
+supports raw source checks, and `ingestion/weather_events.py` converts responses
+and saved captures into canonical event payloads. Saved events can be replayed to
+the dedicated weather Kafka topic. The weather producer fetches and publishes
+fresh events in one live call or an explicitly enabled polling loop. Invalid
+weather events are stored in Iceberg quarantine; valid values use a separate
+latest-response canonical Iceberg sink.
+
+[Weather location configuration](config/weather_locations.json) defines fixed city
+reference coordinates for Munich, Stuttgart, and Hamburg and maps the curated
+OpenAQ stations to those locations. The loader in `ingestion/weather_locations.py`
+validates coordinates and prevents duplicate or ambiguous mappings. These points
+provide city-level context rather than weather measured at the OpenAQ stations.
 
 ## Roadmap
 
-- enrich measurements with weather data
-- expose air-quality anomalies and longer-term trends
-- add operational monitoring and cloud deployment
+Phases 1 and 2 are complete. Phase 3 is in progress: the next outcome is weather
+ingestion followed by temporal and spatial enrichment of air-quality observations.
+See the maintained [Roadmap](docs/roadmap.md) for completed capabilities, upcoming
+work, and phase completion criteria.

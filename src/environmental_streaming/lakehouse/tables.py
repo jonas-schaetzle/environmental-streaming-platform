@@ -5,6 +5,14 @@ ICEBERG_CATALOG = "local"
 ICEBERG_NAMESPACE = f"{ICEBERG_CATALOG}.lake"
 ICEBERG_CANONICAL_TABLE = f"{ICEBERG_NAMESPACE}.canonical_measurements"
 ICEBERG_QUARANTINE_TABLE = f"{ICEBERG_NAMESPACE}.quarantine_measurements"
+ICEBERG_WEATHER_QUARANTINE_TABLE = (
+    f"{ICEBERG_NAMESPACE}.quarantine_weather_observations"
+)
+ICEBERG_WEATHER_CANONICAL_TABLE = f"{ICEBERG_NAMESPACE}.canonical_weather_observations"
+WEATHER_CANONICAL_BATCH_VIEW = "iceberg_canonical_weather_batch"
+WEATHER_CANONICAL_CHECKPOINT_PATH = "data/checkpoints/weather_canonical"
+WEATHER_QUARANTINE_BATCH_VIEW = "iceberg_quarantine_weather_batch"
+WEATHER_QUARANTINE_CHECKPOINT_PATH = "data/checkpoints/weather_quarantine"
 ICEBERG_HOURLY_AGGREGATE_TABLE = (
     f"{ICEBERG_NAMESPACE}.hourly_measurement_aggregates"
 )
@@ -49,6 +57,29 @@ KAFKA_IDENTITY_COLUMNS = (
     "kafka_partition",
     "kafka_offset",
 )
+QUARANTINE_WEATHER_COLUMNS = (
+    "kafka_topic",
+    "kafka_partition",
+    "kafka_offset",
+    "kafka_timestamp",
+    "kafka_key",
+    "raw_value",
+    "source",
+    "source_dataset",
+    "weather_location_id",
+    "city",
+    "latitude",
+    "longitude",
+    "grid_latitude",
+    "grid_longitude",
+    "parameter",
+    "value",
+    "unit",
+    "measured_at_utc",
+    "fetched_at_utc",
+    "validation_error",
+)
+CANONICAL_WEATHER_COLUMNS = QUARANTINE_WEATHER_COLUMNS[:-1]
 HOURLY_AGGREGATE_COLUMNS = (
     "window_start",
     "window_end",
@@ -77,6 +108,74 @@ HOURLY_AGGREGATE_UPDATE_COLUMNS = (
     "maximum_value",
     "latest_measured_at_utc",
 )
+
+
+def ensure_weather_canonical_table(spark: SparkSession) -> None:
+    spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {ICEBERG_NAMESPACE}")
+    spark.sql(
+        f"""
+        CREATE TABLE IF NOT EXISTS {ICEBERG_WEATHER_CANONICAL_TABLE} (
+            kafka_topic STRING,
+            kafka_partition INT,
+            kafka_offset BIGINT,
+            kafka_timestamp TIMESTAMP,
+            kafka_key STRING,
+            raw_value STRING,
+            source STRING NOT NULL,
+            source_dataset STRING NOT NULL,
+            weather_location_id STRING NOT NULL,
+            city STRING NOT NULL,
+            latitude DOUBLE NOT NULL,
+            longitude DOUBLE NOT NULL,
+            grid_latitude DOUBLE NOT NULL,
+            grid_longitude DOUBLE NOT NULL,
+            parameter STRING NOT NULL,
+            value DOUBLE NOT NULL,
+            unit STRING NOT NULL,
+            measured_at_utc TIMESTAMP NOT NULL,
+            fetched_at_utc TIMESTAMP NOT NULL
+        )
+        USING iceberg
+        PARTITIONED BY (days(measured_at_utc))
+        TBLPROPERTIES ('format-version' = '2', 'write.format.default' = 'parquet')
+        """
+    )
+
+
+def ensure_weather_quarantine_table(spark: SparkSession) -> None:
+    spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {ICEBERG_NAMESPACE}")
+    spark.sql(
+        f"""
+        CREATE TABLE IF NOT EXISTS {ICEBERG_WEATHER_QUARANTINE_TABLE} (
+            kafka_topic STRING,
+            kafka_partition INT,
+            kafka_offset BIGINT,
+            kafka_timestamp TIMESTAMP,
+            kafka_key STRING,
+            raw_value STRING,
+            source STRING,
+            source_dataset STRING,
+            weather_location_id STRING,
+            city STRING,
+            latitude DOUBLE,
+            longitude DOUBLE,
+            grid_latitude DOUBLE,
+            grid_longitude DOUBLE,
+            parameter STRING,
+            value DOUBLE,
+            unit STRING,
+            measured_at_utc TIMESTAMP,
+            fetched_at_utc TIMESTAMP,
+            validation_error STRING
+        )
+        USING iceberg
+        PARTITIONED BY (days(kafka_timestamp))
+        TBLPROPERTIES (
+            'format-version' = '2',
+            'write.format.default' = 'parquet'
+        )
+        """
+    )
 
 
 def ensure_iceberg_tables(spark: SparkSession) -> None:

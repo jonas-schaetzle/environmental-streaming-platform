@@ -16,12 +16,29 @@
   and API-key handling.
 - `src/environmental_streaming/ingestion/openaq_producer.py` owns polling, metadata
   enrichment, and source-side deduplication.
+- `src/environmental_streaming/ingestion/weather_locations.py` owns weather location
+  configuration and unambiguous OpenAQ-to-weather mappings.
+- `src/environmental_streaming/ingestion/weather_client.py` owns Open-Meteo HTTP
+  access, response-envelope checks, receipt timestamps, and one-shot raw captures.
+- `src/environmental_streaming/ingestion/weather_events.py` owns source-to-event
+  conversion and canonical exports from saved weather captures.
+- `src/environmental_streaming/ingestion/weather_replay.py` owns one-shot replay
+  of saved canonical weather events without changing their receipt timestamps.
+- `src/environmental_streaming/ingestion/weather_producer.py` owns one-shot and
+  polling weather ingestion through the client to Kafka, including per-location
+  failure isolation and opt-in correction-aware fingerprint state.
 - `src/environmental_streaming/messaging/kafka_publisher.py` owns event
   serialization, Kafka keys, and delivery checks.
 - `src/environmental_streaming/processing/measurement_model.py` owns the canonical
   contract, normalization, validation, and quarantine reasons.
+- `src/environmental_streaming/processing/weather_model.py` owns the weather
+  contract, payload parsing, UTC validation, and quarantine reasons.
 - `src/environmental_streaming/processing/measurement_stream.py` owns Spark stream
-  orchestration, checkpoints, and valid, quarantine, and hourly aggregate sinks.
+  orchestration, checkpoints, valid, quarantine, and hourly aggregate sinks, and
+  reusable Kafka-read and Iceberg merge/write helpers.
+- `src/environmental_streaming/processing/weather_stream.py` owns weather Kafka
+  parsing, newest-response canonical upserts and conflict detection, and the
+  separate Iceberg canonical/quarantine queries and checkpoints.
 - `src/environmental_streaming/lakehouse/tables.py` owns Iceberg table identifiers,
   column contracts, and table creation.
 - `src/environmental_streaming/lakehouse/audit.py` owns read-only Iceberg

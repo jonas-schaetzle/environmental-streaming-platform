@@ -1,0 +1,25 @@
+{
+  "locations": [
+    {
+      "weather_location_id": "munich",
+      "city": "Munich",
+      "latitude": 48.13743,
+      "longitude": 11.57549,
+      "openaq_location_ids": [2669]
+    },
+    {
+      "weather_location_id": "stuttgart",
+      "city": "Stuttgart",
+      "latitude": 48.78232,
+      "longitude": 9.17702,
+      "openaq_location_ids": [2936]
+    },
+    {
+      "weather_location_id": "hamburg",
+      "city": "Hamburg",
+      "latitude": 53.55073,
+      "longitude": 9.99302,
+      "openaq_location_ids": [3071]
+    }
+  ]
+}

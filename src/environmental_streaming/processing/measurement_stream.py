@@ -46,11 +46,15 @@ MEASUREMENT_WINDOW_DURATION = "1 hour"
 MEASUREMENT_WATERMARK_DELAY = "2 hours"
 
 
-def read_kafka_stream(spark: SparkSession) -> DataFrame:
+def read_kafka_stream(
+    spark: SparkSession,
+    topic: str = KAFKA_TOPIC,
+    bootstrap_servers: str = KAFKA_BOOTSTRAP_SERVERS,
+) -> DataFrame:
     return (
         spark.readStream.format("kafka")
-        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
-        .option("subscribe", KAFKA_TOPIC)
+        .option("kafka.bootstrap.servers", bootstrap_servers)
+        .option("subscribe", topic)
         .option("startingOffsets", "earliest")
         .load()
     )
@@ -119,7 +123,7 @@ def aggregate_measurements(
     )
 
 
-def _merge_iceberg_batch(
+def merge_iceberg_batch(
     measurements: DataFrame,
     target_table: str,
     batch_view: str,
@@ -170,7 +174,7 @@ def merge_iceberg_measurement_batch(
     measurements: DataFrame,
     _batch_id: int,
 ) -> None:
-    _merge_iceberg_batch(
+    merge_iceberg_batch(
         measurements,
         ICEBERG_CANONICAL_TABLE,
         ICEBERG_CANONICAL_BATCH_VIEW,
@@ -183,7 +187,7 @@ def merge_iceberg_quarantine_batch(
     measurements: DataFrame,
     _batch_id: int,
 ) -> None:
-    _merge_iceberg_batch(
+    merge_iceberg_batch(
         measurements,
         ICEBERG_QUARANTINE_TABLE,
         ICEBERG_QUARANTINE_BATCH_VIEW,
@@ -196,7 +200,7 @@ def merge_iceberg_hourly_aggregate_batch(
     aggregates: DataFrame,
     _batch_id: int,
 ) -> None:
-    _merge_iceberg_batch(
+    merge_iceberg_batch(
         aggregates,
         ICEBERG_HOURLY_AGGREGATE_TABLE,
         ICEBERG_HOURLY_AGGREGATE_BATCH_VIEW,
@@ -206,7 +210,7 @@ def merge_iceberg_hourly_aggregate_batch(
     )
 
 
-def _write_iceberg_stream(
+def write_iceberg_stream(
     measurements: DataFrame,
     merge_batch: Callable[[DataFrame, int], None],
     checkpoint_path: str,
@@ -221,7 +225,7 @@ def _write_iceberg_stream(
 
 
 def write_iceberg_measurement_stream(measurements: DataFrame) -> StreamingQuery:
-    return _write_iceberg_stream(
+    return write_iceberg_stream(
         measurements,
         merge_iceberg_measurement_batch,
         ICEBERG_CANONICAL_CHECKPOINT_PATH,
@@ -229,7 +233,7 @@ def write_iceberg_measurement_stream(measurements: DataFrame) -> StreamingQuery:
 
 
 def write_iceberg_quarantine_stream(measurements: DataFrame) -> StreamingQuery:
-    return _write_iceberg_stream(
+    return write_iceberg_stream(
         measurements,
         merge_iceberg_quarantine_batch,
         ICEBERG_QUARANTINE_CHECKPOINT_PATH,
@@ -239,7 +243,7 @@ def write_iceberg_quarantine_stream(measurements: DataFrame) -> StreamingQuery:
 def write_iceberg_hourly_aggregate_stream(
     aggregates: DataFrame,
 ) -> StreamingQuery:
-    return _write_iceberg_stream(
+    return write_iceberg_stream(
         aggregates,
         merge_iceberg_hourly_aggregate_batch,
         ICEBERG_HOURLY_AGGREGATE_CHECKPOINT_PATH,
