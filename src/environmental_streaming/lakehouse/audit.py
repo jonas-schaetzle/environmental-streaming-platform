@@ -1,3 +1,4 @@
+import argparse
 import json
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,8 +11,11 @@ from environmental_streaming.lakehouse.tables import (
     ICEBERG_CANONICAL_TABLE,
     ICEBERG_HOURLY_AGGREGATE_TABLE,
     ICEBERG_QUARANTINE_TABLE,
+    ICEBERG_WEATHER_CANONICAL_TABLE,
+    ICEBERG_WEATHER_QUARANTINE_TABLE,
     KAFKA_IDENTITY_COLUMNS,
 )
+from environmental_streaming.processing.weather_model import WEATHER_IDENTITY_COLUMNS
 from environmental_streaming.runtime.spark import create_spark_session
 
 
@@ -43,6 +47,25 @@ TABLE_AUDIT_SPECS = (
         expected_partition="days(window_start)",
     ),
 )
+WEATHER_TABLE_AUDIT_SPECS = (
+    TableAuditSpec(
+        table_name=ICEBERG_WEATHER_CANONICAL_TABLE,
+        identity_columns=WEATHER_IDENTITY_COLUMNS,
+        time_column="measured_at_utc",
+        expected_partition="days(measured_at_utc)",
+    ),
+    TableAuditSpec(
+        table_name=ICEBERG_WEATHER_QUARANTINE_TABLE,
+        identity_columns=KAFKA_IDENTITY_COLUMNS,
+        time_column="kafka_timestamp",
+        expected_partition="days(kafka_timestamp)",
+    ),
+)
+TABLE_AUDIT_SPECS_BY_SOURCE = {
+    "openaq": TABLE_AUDIT_SPECS,
+    "weather": WEATHER_TABLE_AUDIT_SPECS,
+    "all": (*TABLE_AUDIT_SPECS, *WEATHER_TABLE_AUDIT_SPECS),
+}
 
 
 def collect_table_audit(
@@ -137,8 +160,11 @@ def collect_table_audit(
     }
 
 
-def collect_iceberg_audit(spark: SparkSession) -> dict[str, Any]:
-    tables = [collect_table_audit(spark, spec) for spec in TABLE_AUDIT_SPECS]
+def collect_iceberg_audit(
+    spark: SparkSession,
+    specs: tuple[TableAuditSpec, ...] = TABLE_AUDIT_SPECS,
+) -> dict[str, Any]:
+    tables = [collect_table_audit(spark, spec) for spec in specs]
 
     return {
         "status": (
@@ -161,11 +187,19 @@ def _serialize_timestamp(value: object) -> str | None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Read Iceberg table health metrics.")
+    parser.add_argument(
+        "--source",
+        choices=tuple(TABLE_AUDIT_SPECS_BY_SOURCE),
+        default="openaq",
+        help="Tables to audit; defaults to the existing OpenAQ tables.",
+    )
+    args = parser.parse_args()
     spark = create_spark_session()
-    spark.sparkContext.setLogLevel("WARN")
 
     try:
-        report = collect_iceberg_audit(spark)
+        spark.sparkContext.setLogLevel("WARN")
+        report = collect_iceberg_audit(spark, TABLE_AUDIT_SPECS_BY_SOURCE[args.source])
     finally:
         spark.stop()
 

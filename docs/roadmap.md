@@ -90,6 +90,8 @@ Already delivered:
   evidence, transport-key idempotency, and a dedicated replay-safe checkpoint
 - a canonical weather Iceberg sink with newest-response business-key upserts,
   equal-receipt conflict detection, accepted Kafka lineage, and a separate checkpoint
+- read-only weather table auditing with canonical business-key and quarantine
+  transport-key checks, day partitions, latest timestamps, files, and snapshots
 
 Next outcomes:
 
@@ -114,8 +116,9 @@ Deliver it in small, reviewable steps:
 1. Broaden verification of the real multi-location source-to-Kafka-to-Iceberg path,
    including restart behavior, replay with new Kafka offsets, changed values for
    the same hour, out-of-order responses,
-   and explicit catch-up after a polling gap. Extend read-only table auditing and
-   document the operating commands in the README.
+   and explicit catch-up after a polling gap. Extend coverage verification beyond
+   the existing read-only identity/partition audit and document operating commands
+   in the README.
 
 The package is complete when real weather values for the configured locations
 reach Iceberg, unchanged or replayed data creates no duplicate business keys,

@@ -123,7 +123,8 @@ valid particulate measurements before they reach the canonical table.
 Operational tools have deliberately narrow permissions:
 
 - `environmental_streaming.lakehouse.audit` reads table health, identity
-  completeness, duplicates, partitions, freshness, files, and snapshots.
+  completeness, duplicates, partitions, freshness, files, and snapshots. Its
+  `--source` selector supports `openaq` (the unchanged default), `weather`, or `all`.
 - `environmental_streaming.lakehouse.maintenance` reports maintenance needs by
   default. Compaction and snapshot expiration require explicit command flags.
 - `environmental_streaming.diagnostics.kafka_consumer` never commits consumer
@@ -379,8 +380,17 @@ The shared Kafka reader and generic Iceberg merge/write helpers are public in
 `measurement_stream.py`; their OpenAQ defaults and merge behavior are unchanged.
 The Spark factory accepts an application name without changing its defaults.
 Weather query orchestration stops Spark even on failure. No migration is needed
-for the existing OpenAQ warehouse or checkpoints. Weather table audit/maintenance
-integration remains future work.
+for the existing OpenAQ warehouse or checkpoints. Read-only weather table auditing
+is available; weather maintenance integration remains future work.
+
+The weather audit reuses the existing metrics with canonical business-key and
+quarantine transport-key specifications. It reports latest valid time for canonical
+rows and latest Kafka time for quarantine evidence. Its health status checks only
+duplicate/incomplete identities and expected day partitions, not location/hour
+coverage, freshness thresholds, or the full weather payload contract. Missing
+selected tables fail explicitly; the audit never creates tables, writes snapshots,
+or advances Kafka offsets/checkpoints. Existing report fields and the default
+OpenAQ table selection remain compatible; no migration is needed.
 
 The canonical business key survives republishing with new Kafka offsets. Insert
 new keys and update existing keys only when the incoming `fetched_at_utc` is newer.
@@ -449,7 +459,7 @@ cycle. HTTP/conversion/Kafka location failures can recover in the next cycle,
 whereas invalid state and persistence errors terminate the loop. Ctrl+C exits 130;
 previously committed progress remains intact, with the documented duplicate risk
 for interruption between delivery and state persistence. State version 1 remains
-compatible. Historical catch-up and weather table auditing remain separate work.
+compatible. Historical catch-up remains separate work.
 
 A crash after Kafka delivery but before state persistence can produce a duplicate;
 the sink's business key handles it. Replay saved events with their original fetch

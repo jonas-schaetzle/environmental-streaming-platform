@@ -185,7 +185,7 @@ Inspect Kafka events without committing consumer offsets:
 python -m environmental_streaming.diagnostics.kafka_consumer
 ```
 
-Audit all Iceberg tables after a pipeline run or backfill:
+Audit the three OpenAQ Iceberg tables after a pipeline run or backfill:
 
 ```bash
 python -m environmental_streaming.lakehouse.audit
@@ -194,6 +194,9 @@ python -m environmental_streaming.lakehouse.audit
 The JSON report includes row and data-file counts, duplicate or incomplete identity
 keys, hidden partitioning, freshness timestamps, and snapshot metadata. The command
 returns a non-zero exit code when any table fails its identity or partition checks.
+Use `--source weather` for both weather tables, or `--source all` for all five
+tables. The default remains `--source openaq` so existing OpenAQ-only deployments
+do not require weather tables.
 
 Inspect small-file and snapshot maintenance needs without changing the tables:
 
@@ -431,7 +434,19 @@ watermark is applied. Existing OpenAQ queries and tables are unchanged.
 Valid weather events are not stored by this query. Run the separate canonical
 sink below as well. Quarantine progress does not guarantee retention of valid
 data; each sink needs sufficient Kafka retention to catch up independently.
-Weather table auditing remains planned.
+Both weather tables can be inspected without changing data or processing state:
+
+```bash
+python -m environmental_streaming.lakehouse.audit --source weather
+```
+
+Canonical uniqueness uses source, dataset, weather location, parameter, and UTC
+hour, not Kafka offsets; quarantine uniqueness uses topic, partition, and offset.
+The report includes incomplete identities, partitions, latest event/transport
+timestamps, files, and snapshots. Missing tables fail the command rather than
+being created or silently skipped. Run both sinks first, even if quarantine is
+empty. `healthy` means identity and partition checks passed; it does not certify
+coverage of every location/hour, freshness thresholds, or full payload validity.
 
 ### Canonical Weather Storage
 
