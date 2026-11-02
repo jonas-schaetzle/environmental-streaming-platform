@@ -1,5 +1,5 @@
 from datetime import datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 from pyspark.sql import SparkSession
@@ -9,6 +9,12 @@ from environmental_streaming.lakehouse.audit import (
     TableAuditSpec,
     collect_table_audit,
 )
+from environmental_streaming.lakehouse.tables import (
+    ICEBERG_WEATHER_CANONICAL_TABLE,
+    ICEBERG_WEATHER_QUARANTINE_TABLE,
+    KAFKA_IDENTITY_COLUMNS,
+)
+from environmental_streaming.processing.weather_model import WEATHER_IDENTITY_COLUMNS
 
 
 def _query_result(row: dict[str, object] | None) -> MagicMock:
@@ -110,21 +116,103 @@ def test_collect_table_audit_marks_invalid_identity_or_partition_unhealthy() -> 
     assert report["latest_snapshot_id"] is None
 
 
-def test_main_exits_with_error_for_unhealthy_report(
+def test_weather_audits_use_business_and_transport_identities() -> None:
+    canonical, quarantine = iceberg_table_audit.WEATHER_TABLE_AUDIT_SPECS
+    assert canonical.table_name == ICEBERG_WEATHER_CANONICAL_TABLE
+    assert canonical.identity_columns == WEATHER_IDENTITY_COLUMNS
+    assert canonical.time_column == "measured_at_utc"
+    assert quarantine.table_name == ICEBERG_WEATHER_QUARANTINE_TABLE
+    assert quarantine.identity_columns == KAFKA_IDENTITY_COLUMNS
+    assert quarantine.time_column == "kafka_timestamp"
+    for spec in (canonical, quarantine):
+        for duplicates, nulls, partition in (
+            (0, 0, spec.expected_partition),
+            (1, 0, spec.expected_partition),
+            (0, 1, spec.expected_partition),
+            (0, 0, "unexpected_partition"),
+        ):
+            spark = _audit_spark(
+                duplicate_rows=duplicates,
+                null_identity_rows=nulls,
+                partition=partition,
+            )
+            report = collect_table_audit(spark, spec)
+            healthy = duplicates == nulls == 0 and partition == spec.expected_partition
+            assert report["status"] == ("healthy" if healthy else "unhealthy")
+            assert report["duplicate_rows"] == duplicates
+            assert report["null_identity_rows"] == nulls
+            assert report["identity_columns"] == list(spec.identity_columns)
+            queries = [call.args[0] for call in spark.sql.call_args_list]
+            assert f"MAX({spec.time_column})" in queries[0]
+            assert f"GROUP BY {', '.join(spec.identity_columns)}" in queries[1]
+            assert all(
+                query.lstrip().startswith(("SELECT", "DESCRIBE")) for query in queries
+            )
+
+
+def test_collect_iceberg_audit_preserves_default_and_aggregates_selected_tables(
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
 ) -> None:
     spark = MagicMock(spec=SparkSession)
+    collect = Mock(return_value={"status": "healthy"})
+    monkeypatch.setattr(iceberg_table_audit, "collect_table_audit", collect)
+    assert iceberg_table_audit.collect_iceberg_audit(spark)["status"] == "healthy"
+    assert [call.args[1] for call in collect.call_args_list] == list(
+        iceberg_table_audit.TABLE_AUDIT_SPECS
+    )
+    for source in ("weather", "all"):
+        collect.reset_mock()
+        specs = iceberg_table_audit.TABLE_AUDIT_SPECS_BY_SOURCE[source]
+        collect.side_effect = [
+            {"status": "healthy"} for _ in specs[:-1]
+        ] + [{"status": "unhealthy"}]
+        report = iceberg_table_audit.collect_iceberg_audit(spark, specs)
+        assert report["status"] == "unhealthy"
+        assert len(report["tables"]) == len(specs)
+        assert [call.args[1] for call in collect.call_args_list] == list(specs)
+
+
+@pytest.mark.parametrize("source", [None, "openaq", "weather", "all"])
+@pytest.mark.parametrize("status", ["healthy", "unhealthy"])
+def test_main_selects_tables_and_exits_with_report_status(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    source: str | None,
+    status: str,
+) -> None:
+    spark = MagicMock(spec=SparkSession)
+    monkeypatch.setattr(
+        "sys.argv", ["audit", *(["--source", source] if source else [])]
+    )
+    monkeypatch.setattr(iceberg_table_audit, "create_spark_session", lambda: spark)
+    collect = Mock(return_value={"status": status, "tables": []})
+    monkeypatch.setattr(iceberg_table_audit, "collect_iceberg_audit", collect)
+
+    if status == "unhealthy":
+        with pytest.raises(SystemExit) as error:
+            iceberg_table_audit.main()
+        assert error.value.code == 1
+    else:
+        iceberg_table_audit.main()
+
+    collect.assert_called_once_with(
+        spark, iceberg_table_audit.TABLE_AUDIT_SPECS_BY_SOURCE[source or "openaq"]
+    )
+    assert f'"status": "{status}"' in capsys.readouterr().out
+    spark.stop.assert_called_once_with()
+
+
+def test_main_does_not_hide_missing_tables_and_stops_spark(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spark = MagicMock(spec=SparkSession)
+    monkeypatch.setattr("sys.argv", ["audit", "--source", "weather"])
     monkeypatch.setattr(iceberg_table_audit, "create_spark_session", lambda: spark)
     monkeypatch.setattr(
         iceberg_table_audit,
         "collect_iceberg_audit",
-        lambda _spark: {"status": "unhealthy", "tables": []},
+        Mock(side_effect=RuntimeError("table missing")),
     )
-
-    with pytest.raises(SystemExit) as error:
+    with pytest.raises(RuntimeError, match="table missing"):
         iceberg_table_audit.main()
-
-    assert error.value.code == 1
-    assert '"status": "unhealthy"' in capsys.readouterr().out
     spark.stop.assert_called_once_with()
