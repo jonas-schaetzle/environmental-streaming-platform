@@ -95,6 +95,10 @@ catalog is named `local`, and its warehouse is stored under `data/warehouse`.
 ## Time And State Semantics
 
 - OpenAQ observations are keyed in Kafka by sensor ID.
+- The Compose broker explicitly writes records and KRaft metadata to
+  `/var/lib/kafka/data`, bind-mounted from ignored `data/kafka/`. Its API is
+  published only on loopback and has a readiness health check. Existing-container
+  migration and restart limits are documented in [Local Kafka](local-kafka.md).
 - Producer state records the latest published timestamp per sensor and suppresses
   unchanged API results across producer restarts.
 - Spark starts from Kafka's earliest offsets only when no checkpoint exists.
@@ -514,11 +518,11 @@ continue between cloud sessions. Existing availableNow processing remains bounde
 a scheduled product refresh must show its last update and data freshness.
 
 Kafka log data, producer state, each independent checkpoint and the warehouse need
-durable paths across container restart and host reboot. The current Compose broker
-has no explicit persistent data mount; inspect and preserve its current data before
-changing storage. Bind Kafka to loopback for cloud use and access a future result
-view through an SSH tunnel rather than exposing Kafka publicly. Resource recreation
-and recovery of retained state are distinct acceptance checks. Termination/storage
+durable paths across container restart and host reboot. The Compose broker now has
+an explicit persistent data mount and loopback binding. Existing brokers require
+the documented data-preserving migration before recreation. Access a future result
+view through an SSH tunnel. Resource recreation and recovery of retained state
+are distinct acceptance checks. Termination/storage
 deletion needs an explicit evidence-retention and cleanup decision.
 
 A bounded read-only joint product is proposed instead of adding a stateful stream

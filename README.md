@@ -14,6 +14,7 @@ stores canonical, quarantined, and hourly aggregate data in Apache Iceberg.
 - [Development Workflow](docs/development-workflow.md)
 - [Delivery Plan Through 11 December 2026](docs/delivery-plan.md)
 - [Free AWS Preflight And Cost Planning](docs/aws-preflight.md)
+- [Local Kafka Storage And Restart](docs/local-kafka.md)
 
 ## Architecture
 
@@ -105,11 +106,21 @@ installations, including Homebrew JDK paths on macOS. Java 21 can be installed w
 brew install openjdk@21
 ```
 
-Start Kafka:
+For a fresh environment, initialize the persistent Kafka directory and start the
+broker, waiting for its API health check:
 
 ```bash
-docker compose up -d
+mkdir -p data/kafka
+docker compose up -d --wait --wait-timeout 120 broker
 ```
+
+If a Kafka container already exists from the earlier configuration, follow the
+[storage migration procedure](docs/local-kafka.md#migrating-the-previous-broker)
+**before** running the updated Compose configuration. Replacing an old container
+without copying its active log directory can lose its Kafka state. The new broker
+stores records and KRaft metadata under ignored `data/kafka/` and publishes port
+9092 only on loopback. Producer state and Spark checkpoints stay at their existing
+paths. Persistent storage does not extend Kafka retention or provide backups.
 
 Create the canonical measurement topic once:
 
