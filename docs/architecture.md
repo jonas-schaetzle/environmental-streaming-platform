@@ -7,9 +7,10 @@ restartable, auditable analytical data products. The current production path use
 OpenAQ as its source, Kafka as the event backbone, Spark Structured Streaming for
 validation and event-time processing, and Apache Iceberg for analytical storage.
 
-The platform is local-first today, but its state, contracts, and operational
-boundaries are designed to remain explicit when the system moves to managed
-infrastructure.
+The platform is local-first today. The planned AWS target is one machine running
+the existing Kafka, local-mode Spark and Iceberg stack for bounded integration
+and demonstration sessions. State, contracts and operational boundaries remain
+explicit; managed Kafka/Spark and high availability are outside the delivery scope.
 
 ## Current Data Flow
 
@@ -137,7 +138,7 @@ Secrets belong in environment variables or the ignored `.env` file. Producer
 state, Spark checkpoints, Iceberg data, and downloaded measurements belong under
 `data/` and remain untracked.
 
-## Planned Weather Ingestion
+## Weather Ingestion
 
 The weather event model, location configuration, Open-Meteo HTTP client, and
 canonical event conversion are implemented and tested. The client supports
@@ -498,3 +499,31 @@ OpenAQ contract or state. Contract and identity changes after the first weather
 deployment require an explicit compatibility and migration decision. A second
 stream processor such as Flink remains conditional on a concrete low-latency use
 case that justifies another runtime and state model.
+
+## Planned Single-Machine AWS Target
+
+The [delivery plan](delivery-plan.md) records the 2026-12-11 deadline, approximately
+six maintainer hours per week, and EUR 20 total additional gross project budget.
+Terraform and the cloud runtime are not implemented yet. The
+[free AWS preflight](aws-preflight.md) records the initial checks and approval gate;
+no chargeable provisioning is authorized by the architecture description.
+
+The proposed deployment keeps Kafka, bounded sequential Spark queries and the
+Hadoop Iceberg catalog on one Linux EC2 host. Local development/data collection
+continue between cloud sessions. Existing availableNow processing remains bounded;
+a scheduled product refresh must show its last update and data freshness.
+
+Kafka log data, producer state, each independent checkpoint and the warehouse need
+durable paths across container restart and host reboot. The current Compose broker
+has no explicit persistent data mount; inspect and preserve its current data before
+changing storage. Bind Kafka to loopback for cloud use and access a future result
+view through an SSH tunnel rather than exposing Kafka publicly. Resource recreation
+and recovery of retained state are distinct acceptance checks. Termination/storage
+deletion needs an explicit evidence-retention and cleanup decision.
+
+A bounded read-only joint product is proposed instead of adding a stateful stream
+join. Regenerating its report can pick up newer accepted weather revisions without
+changing ingestion schemas, merge keys, watermarks or checkpoints. Its UTC alignment,
+missing-match behavior and mapping policy must be tested before implementation is
+accepted. These design choices require alignment before the runtime/product package;
+this documentation changes no data contract or existing state.
