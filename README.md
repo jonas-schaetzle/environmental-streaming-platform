@@ -12,6 +12,8 @@ stores canonical, quarantined, and hourly aggregate data in Apache Iceberg.
 - [Architecture](docs/architecture.md)
 - [Roadmap](docs/roadmap.md)
 - [Development Workflow](docs/development-workflow.md)
+- [Delivery Plan Through 11 December 2026](docs/delivery-plan.md)
+- [Free AWS Preflight And Cost Planning](docs/aws-preflight.md)
 
 ## Architecture
 
@@ -515,7 +517,19 @@ provide city-level context rather than weather measured at the OpenAQ stations.
 
 ## Roadmap
 
-Phases 1 and 2 are complete. Phase 3 is in progress: the next outcome is weather
-ingestion followed by temporal and spatial enrichment of air-quality observations.
-See the maintained [Roadmap](docs/roadmap.md) for completed capabilities, upcoming
-work, and phase completion criteria.
+Phases 0-2 are complete. Weather ingestion, correction-aware polling, separate
+Iceberg sinks, and weather auditing are implemented. Next are broader real-path
+restart/coverage verification, joint air-quality/weather analysis, a small result
+view, and data-quality alerts.
+
+Completion is scheduled for **11 December 2026**, with about six maintainer hours
+per week. AWS is required for a reproducible single-machine deployment and bounded
+integration/demo sessions. Development and data collection remain local; additional
+project costs are limited to **EUR 20 total including taxes through completion**,
+not per month. Chargeable resources require a concrete estimate and explicit
+approval before creation. There is no permanent cloud operation or HA target.
+
+See the [Roadmap](docs/roadmap.md), [delivery plan](docs/delivery-plan.md), and
+[free AWS preflight](docs/aws-preflight.md) for milestones, acceptance evidence,
+remaining account checks, and cost assumptions. No AWS deployment is implemented
+or authorized by this documentation.

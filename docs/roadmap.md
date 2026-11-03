@@ -17,6 +17,13 @@ or missing data.
 
 ## Phase Overview
 
+The delivery deadline is **2026-12-11**, with about six maintainer hours per week
+and **EUR 20 total additional project costs including taxes** through completion.
+AWS is required, but development/data collection stay local; cloud use is limited
+to explicitly approved integration and demonstration sessions on one machine.
+The [delivery plan](delivery-plan.md) defines the dated milestones and acceptance
+criteria. The first package is the [free AWS preflight](aws-preflight.md).
+
 | Phase | Outcome | Status |
 |---|---|---|
 | Phase 0 | Stable real-data foundation | Complete |
@@ -95,15 +102,16 @@ Already delivered:
 
 Next outcomes:
 
-1. Ingest weather observations through a dedicated source contract.
-2. Store weather data with replay-safe identities and auditable lineage.
-3. Join air-quality and weather observations by location and event time.
-4. Add city comparison and longer-term time-series views.
-5. Introduce explainable anomaly and missing-data alerts.
+1. Complete the free AWS account/resource/billing preflight and local restart and
+   coverage evidence for the implemented source paths.
+2. Join air-quality and weather values by configured location and UTC time, with
+   an explicit refresh policy for accepted weather corrections.
+3. Add a small time-series and city-comparison view using the collected history.
+4. Add explainable stale/missing-data and quarantine alerts with traceable evidence.
 
-### Next Package - Weather Ingestion
+### Weather Verification And Next Product Package
 
-The [planned weather architecture](architecture.md#planned-weather-ingestion)
+The [implemented weather architecture](architecture.md#weather-ingestion)
 defines Open-Meteo hourly model data, a dedicated event contract, dataset-aware
 business identities, and correction and replay semantics. The weather contract,
 location configuration, HTTP client, canonical conversion, and their validation
@@ -111,7 +119,8 @@ tests are implemented. Raw source checks, event exports, and explicit Kafka
 replay, direct live ingestion, stateful polling, and separate canonical/quarantine
 weather Iceberg sinks are available.
 
-Deliver it in small, reviewable steps:
+The implementation is available; operational verification still needs broader
+repeatable evidence before weather ingestion is considered fully accepted:
 
 1. Broaden verification of the real multi-location source-to-Kafka-to-Iceberg path,
    including restart behavior, replay with new Kafka offsets, changed values for
@@ -120,7 +129,7 @@ Deliver it in small, reviewable steps:
    the existing read-only identity/partition audit and document operating commands
    in the README.
 
-The package is complete when real weather values for the configured locations
+Weather verification is complete when real values for the configured locations
 reach Iceberg, unchanged or replayed data creates no duplicate business keys,
 newer responses update existing keys, older replays cannot revert them, and invalid
 events retain their trace metadata in quarantine. Air-quality joins and alerts are
@@ -132,13 +141,21 @@ actionable alerts with traceable evidence.
 
 ## Phase 4 - Operations And Cloud
 
-Planned outcomes:
+Required completion outcomes:
 
-- metrics and structured logs for ingestion, processing, freshness, and failures
-- Kafka lag and checkpoint health monitoring
-- infrastructure defined with Terraform
-- reproducible cloud deployment and documented operating procedures
-- CI/CD and security checks appropriate for the deployed environment
+- Terraform and a pinned runtime/bootstrap for a single AWS machine
+- durable Kafka data, producer state, Iceberg warehouse, and separate checkpoints
+  across process/container restart and reboot
+- bounded real API-to-Iceberg runs, restart/replay evidence, and repeatable deployment
+- basic operational reports and data-quality alerts, reusing existing audits
+- explicit cost approval, aggregate runtime/storage limits, teardown verification,
+  and a runbook with known limitations
+
+No Kubernetes, high availability, managed Kafka/Spark, or permanent cloud operation
+is planned. Broader monitoring, notification integrations and automated delivery
+can follow later; the current Ruff/Pytest CI remains the baseline. Budget alerts
+do not impose a hard spending cap. See the [AWS preflight](aws-preflight.md) for
+the conservative estimate, unknown billing fields and approval gate.
 
 ## Success Criteria
 
