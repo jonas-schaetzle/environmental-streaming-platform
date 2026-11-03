@@ -120,7 +120,16 @@ replay, direct live ingestion, stateful polling, and separate canonical/quaranti
 weather Iceberg sinks are available.
 
 The implementation is available; operational verification still needs broader
-repeatable evidence before weather ingestion is considered fully accepted:
+repeatable evidence before weather ingestion is considered fully accepted.
+
+The [local Kafka verification](local-kafka.md#verification-evidence) records the
+2026-11-03 real multi-location ingestion, preserved broker state across migration,
+restart and recreation, and unchanged Iceberg snapshots on a second Spark run.
+Source freshness gaps and host-dependent audit timestamp formatting remain explicit
+follow-ups; make report timestamps unambiguous before the joint product relies on
+them. Correction replay and polling-gap catch-up still need broader real-path evidence.
+
+Remaining verification:
 
 1. Broaden verification of the real multi-location source-to-Kafka-to-Iceberg path,
    including restart behavior, replay with new Kafka offsets, changed values for

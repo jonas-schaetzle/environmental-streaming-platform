@@ -62,10 +62,10 @@ architecture changes.
   on one EC2 host. Use one canonical writer per weather table and bounded,
   sequential Spark runs. Benchmark memory locally before selecting the instance.
 - Keep Kafka data, producer state, Iceberg data, and separate checkpoints on durable
-  storage across process/container restart. The current Compose broker has no
-  explicit persistent data mount and publishes port 9092 on all host interfaces.
-  Inspect/preserve current broker data before changing its mount; never recreate it
-  as a shortcut. Restrict Kafka to loopback for cloud use.
+  storage across process/container restart. Compose now configures an explicit
+  persistent mount and loopback port binding. Existing brokers require the
+  [documented migration](local-kafka.md) before recreation; never discard their
+  data to make the new mount work. Host reboot remains a separate acceptance check.
 - Build the joint product as a bounded read from trusted tables, with deterministic
   report regeneration. This avoids a new streaming join/checkpoint and lets newer
   accepted weather revisions appear on the next product refresh.
@@ -134,7 +134,8 @@ ongoing Git authorization. The maintained roadmap and README link this plan and
 the [AWS preflight](aws-preflight.md).
 
 Before implementing the joint product and cloud runtime, align on the proposed
-bounded product refresh and single-host persistence approach. The next local
-package should establish restart/coverage evidence and safe persistent Kafka
-storage, preserving current broker data. AWS billing/credit confirmation can
-proceed separately and does not block cost-free local development.
+bounded product refresh. The local persistence package establishes broker restart
+evidence and safe Kafka storage, preserving current broker data; see
+[Local Kafka](local-kafka.md). Broader source coverage and host-reboot evidence
+remain required. AWS billing/credit confirmation can proceed separately and does
+not block cost-free local development.
