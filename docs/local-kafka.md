@@ -143,6 +143,10 @@ weather was present for all three configured reference locations. Finalized hour
 air-quality output still depends on later event-time input advancing its watermark;
 successful ingestion alone does not make every recent hourly window available.
 
+The subsequent [source coverage review](data-sources.md) switches active Hamburg
+polling to Sternschanze (3015), retaining the old Hafen identity and its weather
+mapping. The dated Kafka evidence above continues to describe the earlier setup.
+
 At the time of the 2026-11-03 check, the audit serialized collected Python
 datetimes without a timezone suffix.
 The first local audit displayed host-local times; the final comparison ran report

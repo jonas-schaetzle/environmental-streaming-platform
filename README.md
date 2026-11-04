@@ -15,6 +15,7 @@ stores canonical, quarantined, and hourly aggregate data in Apache Iceberg.
 - [Delivery Plan Through 11 December 2026](docs/delivery-plan.md)
 - [Free AWS Preflight And Cost Planning](docs/aws-preflight.md)
 - [Local Kafka Storage And Restart](docs/local-kafka.md)
+- [Curated Source Coverage And Station History](docs/data-sources.md)
 
 ## Architecture
 
@@ -142,6 +143,14 @@ Run one ingestion cycle for the curated locations in
 ```bash
 python -m environmental_streaming.ingestion.openaq_producer
 ```
+
+The active stations are Munich Stachus (2669), Stuttgart Bad Cannstatt (2936), and
+Hamburg Sternschanze (3015). Sternschanze replaces the stale Hafen station (3071)
+for default polling and current insights. Existing Hafen data and producer-state
+entries remain intact, and its historical Hamburg weather mapping is retained.
+See [source coverage](docs/data-sources.md) for the dated selection evidence and
+the policy for keeping the two station histories distinct. HTTP success and a
+location's newest timestamp do not guarantee fresh readings for every parameter.
 
 Poll the configured locations continuously:
 

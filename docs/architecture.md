@@ -211,12 +211,21 @@ labels, non-numeric or non-finite coordinates, and coordinates outside WGS84
 latitude/longitude bounds. It trims surrounding whitespace from weather IDs and
 city labels before checking uniqueness. It validates mapping structure; it does
 not call OpenAQ to verify station existence or require every configured station
-to have weather coverage. A repository test checks that the curated files agree.
+to have weather coverage. A repository test checks that every actively polled
+station is mapped once and that additional historical IDs are explicitly retained.
 
 Weather IDs identify fixed reference coordinates over time. Editing a city's
 reference point requires a new weather ID and an explicit mapping update,
 regardless of processing state. Station mappings are static for now; changes
 after ingestion starts require a documented historical join policy.
+
+The [curated source policy](data-sources.md#active-selection-and-historical-mapping)
+records the 2026-11-04 Hamburg change: active polling uses Sternschanze (3015),
+while retired Hafen (3071) remains mapped to the same unchanged `hamburg` weather
+reference. Their air-quality IDs, histories and Kafka lineage remain distinct.
+The mapping is additive for fixed city context; it does not splice station series
+or relabel old rows. Current insights use only the active station configuration.
+No event schema, Iceberg identity, checkpoint or producer-state reset is involved.
 
 Request hourly data in UTC with explicit Celsius, metres-per-second, and millimetre
 settings. Initially publish only hours at or before the current UTC hour. Future
