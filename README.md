@@ -16,6 +16,7 @@ stores canonical, quarantined, and hourly aggregate data in Apache Iceberg.
 - [Free AWS Preflight And Cost Planning](docs/aws-preflight.md)
 - [Local Kafka Storage And Restart](docs/local-kafka.md)
 - [Curated Source Coverage And Station History](docs/data-sources.md)
+- [Hourly Air-Quality And Weather Insights](docs/hourly-environmental-insights.md)
 
 ## Architecture
 
@@ -281,6 +282,26 @@ and producer state are unchanged; no lake migration or replay is needed.
 All runtime state, checkpoints, and measurement outputs live under `data/` and are
 excluded from version control. Legacy Parquet outputs and checkpoints may remain
 there after the Iceberg cutover, but the pipeline no longer updates or deletes them.
+
+## Joint Hourly Environmental Report
+
+Combine finalized hourly air-quality statistics with canonical weather on a
+complete station/hour grid:
+
+```bash
+python -m environmental_streaming.products.hourly_environmental_insights \
+  --parameter pm25 --hours 48
+```
+
+The bounded read-only report uses explicit station mappings and UTC, preserves
+missing data, and records its Iceberg snapshot inputs. Point weather is labelled
+at the start of each hour; precipitation is aligned from its preceding-hour sum
+at the end. Later refreshes use accepted weather corrections. Missing finalized
+aggregates remain visible even when current measurements exist. All input tables
+must already exist; Kafka can remain stopped.
+
+See [Hourly Insights](docs/hourly-environmental-insights.md) for coverage meanings,
+station-comparison limits, attribution and reproduction with snapshot IDs.
 
 ## Weather Source Check
 
@@ -549,9 +570,9 @@ provide city-level context rather than weather measured at the OpenAQ stations.
 ## Roadmap
 
 Phases 0-2 are complete. Weather ingestion, correction-aware polling, separate
-Iceberg sinks, and weather auditing are implemented. Next are broader real-path
-restart/coverage verification, joint air-quality/weather analysis, a small result
-view, and data-quality alerts.
+Iceberg sinks, weather auditing and a joint hourly air-quality/weather report are
+implemented. Next are broader real-path restart/coverage verification, a small
+time-series and comparison view, and data-quality alerts.
 
 Completion is scheduled for **11 December 2026**, with about six maintainer hours
 per week. AWS is required for a reproducible single-machine deployment and bounded
