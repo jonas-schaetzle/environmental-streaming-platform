@@ -525,8 +525,10 @@ quarantine progress alone does not preserve them.
 Use `measured_at_utc` for event-time alignment and `fetched_at_utc` for ingestion
 lineage. The initial weather sinks have no aggregation watermark and accept old
 valid rows and newer responses for old hours. The existing two-hour OpenAQ
-watermark remains specific to air-quality aggregation. Later joins must explicitly
-define how weather corrections update already-produced analytical results.
+watermark remains specific to air-quality aggregation. The hourly product refresh
+uses the latest accepted weather snapshot; earlier report artifacts stay fixed
+and can be reproduced from their retained input snapshots. Future persisted
+derived tables must define their own correction/update policy.
 
 Join through the configured location mapping and UTC time, accounting for each
 parameter's time meaning. For example, precipitation labelled `11:00Z` describes
@@ -539,6 +541,31 @@ OpenAQ contract or state. Contract and identity changes after the first weather
 deployment require an explicit compatibility and migration decision. A second
 stream processor such as Flink remains conditional on a concrete low-latency use
 case that justifies another runtime and state model.
+
+## Joint Hourly Environmental Product
+
+`products/hourly_environmental_insights.py` builds a bounded, read-only comparison
+from `hourly_measurement_aggregates` and `canonical_weather_observations`. It pins
+each table's `main` snapshot independently, then uses structured Spark joins onto
+an explicit active-station/UTC-hour grid. It creates no new sink, checkpoint or
+streaming state and changes no source schema, merge identity or watermark.
+
+Air quality uses existing finalized hourly statistics for one selected parameter
+and canonical mass unit. Weather point values join at window start; precipitation
+joins its preceding-hour total at window end. Every requested station/hour remains
+in the result, with nulls and explicit availability statuses when either source
+is missing. Missing finalized aggregates can also mean the streaming watermark is
+still waiting; the report does not infer that source observations never existed.
+
+The version-1 JSON includes station identities, coverage, weather receipt and Kafka
+lineage, attribution and both snapshot IDs. It can refresh accepted weather
+corrections without changing old artifacts; optional snapshot IDs reproduce a prior
+read while retention permits. It does not create an atomic snapshot across both
+source tables. All nested timestamps cross the Spark/Python boundary as epoch
+microseconds and are serialized explicitly in UTC.
+
+See [Hourly Environmental Insights](hourly-environmental-insights.md) for CLI
+commands, temporal semantics, correction behavior, limits and verification.
 
 ## Planned Single-Machine AWS Target
 
@@ -561,9 +588,8 @@ view through an SSH tunnel. Resource recreation and recovery of retained state
 are distinct acceptance checks. Termination/storage
 deletion needs an explicit evidence-retention and cleanup decision.
 
-A bounded read-only joint product is proposed instead of adding a stateful stream
-join. Regenerating its report can pick up newer accepted weather revisions without
-changing ingestion schemas, merge keys, watermarks or checkpoints. Its UTC alignment,
-missing-match behavior and mapping policy must be tested before implementation is
-accepted. These design choices require alignment before the runtime/product package;
-this documentation changes no data contract or existing state.
+The bounded joint product above can run on the same host after the streaming jobs.
+Scheduling, view serving and runtime sizing remain deployment work. Regenerating
+the report picks up accepted source snapshots without introducing another stateful
+stream join. Cloud provisioning still requires a concrete cost calculation and
+explicit approval.

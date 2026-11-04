@@ -29,8 +29,10 @@ Ruff passes; all 95 tests pass. Spark tests require local socket permissions.
 
 Phases 0-2 are complete. Weather contracts, configuration, ingestion, polling,
 correction-aware producer state, replay, separate Iceberg sinks, and read-only
-weather audits are implemented. A joint product, graphical result view, data
-quality alerts, Terraform, and an AWS operating procedure are absent.
+weather audits were implemented at that baseline. A joint product, graphical result
+view, data-quality alerts, Terraform, and an AWS operating procedure were absent.
+The joint hourly report has since been implemented; see its
+[current contract](hourly-environmental-insights.md).
 
 Before this package, README/roadmap described delivered weather functionality as
 upcoming and architecture used a planned-weather heading for implemented modules.
@@ -133,9 +135,9 @@ require separate explicit instruction under AGENTS.md; this plan does not grant
 ongoing Git authorization. The maintained roadmap and README link this plan and
 the [AWS preflight](aws-preflight.md).
 
-Before implementing the joint product and cloud runtime, align on the proposed
-bounded product refresh. The local persistence package establishes broker restart
-evidence and safe Kafka storage, preserving current broker data; see
-[Local Kafka](local-kafka.md). Broader source coverage and host-reboot evidence
-remain required. AWS billing/credit confirmation can proceed separately and does
-not block cost-free local development.
+The bounded joint product is implemented with snapshot-pinned reads, explicit
+missing hours and tested correction refresh. The next product packages are the
+small result view and data-quality alerts. The local persistence package establishes
+broker restart evidence and safe Kafka storage; see [Local Kafka](local-kafka.md).
+Broader source coverage and host-reboot evidence remain required. AWS billing/credit
+confirmation can proceed separately and does not block cost-free local development.
