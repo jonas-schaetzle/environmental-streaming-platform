@@ -34,16 +34,21 @@ def test_curated_weather_locations_cover_current_openaq_locations() -> None:
     assert locations == (
         WeatherLocation("munich", "Munich", 48.13743, 11.57549, (2669,)),
         WeatherLocation("stuttgart", "Stuttgart", 48.78232, 9.17702, (2936,)),
-        WeatherLocation("hamburg", "Hamburg", 53.55073, 9.99302, (3071,)),
+        WeatherLocation("hamburg", "Hamburg", 53.55073, 9.99302, (3071, 3015)),
     )
     openaq_config = json.loads(
         (REPOSITORY_ROOT / "config/openaq_locations.json").read_text(encoding="utf-8")
     )
-    assert {
+    mapped_ids = {
         identifier
         for location in locations
         for identifier in location.openaq_location_ids
-    } == {location["id"] for location in openaq_config["locations"]}
+    }
+    active_ids = {location["id"] for location in openaq_config["locations"]}
+    assert active_ids == {2669, 2936, 3015}
+    assert active_ids <= mapped_ids
+    # Retired stations retain their historical weather context, not active polling.
+    assert mapped_ids - active_ids == {3071}
 
 
 def test_loader_normalizes_labels_and_supports_multiple_stations(

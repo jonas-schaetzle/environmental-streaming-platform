@@ -19,7 +19,7 @@
       "city": "Hamburg",
       "latitude": 53.55073,
       "longitude": 9.99302,
-      "openaq_location_ids": [3071]
+      "openaq_location_ids": [3071, 3015]
     }
   ]
 }

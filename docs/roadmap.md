@@ -101,6 +101,8 @@ Already delivered:
   transport-key checks, day partitions, latest timestamps, files, and snapshots
 - timezone-independent report timestamps, air-quality freshness and maintenance
   snapshot-age checks, with explicit UTC audit output
+- a verified active Hamburg source at Sternschanze, retaining Hafen history and
+  its city-weather mapping with an explicit station-transition policy
 
 Next outcomes:
 
@@ -130,6 +132,12 @@ restart and recreation, and unchanged Iceberg snapshots on a second Spark run.
 The host-dependent audit/insight timestamp issue is addressed by the
 [UTC report boundary](architecture.md#report-timestamp-boundary). Source freshness
 gaps, correction replay and polling-gap catch-up still need broader real-path evidence.
+
+The [source coverage review](data-sources.md) replaces the stale Hamburg Hafen
+default with Sternschanze while preserving both identities and historical context.
+Some sensors still expose old values even at an otherwise current station;
+freshness remains a per-parameter concern, and latest polling does not prove
+complete hourly coverage.
 
 Remaining verification:
 
