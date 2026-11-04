@@ -19,6 +19,7 @@ from environmental_streaming.lakehouse.tables import (
     ICEBERG_HOURLY_AGGREGATE_TABLE,
 )
 from environmental_streaming.runtime.spark import create_spark_session
+from environmental_streaming.runtime.timestamps import collect_utc_rows
 
 
 DEFAULT_FRESHNESS_THRESHOLD_MINUTES = 120
@@ -171,14 +172,13 @@ def collect_air_quality_report(
         .where(col("location_id").isin(configured_ids))
     )
 
-    measurement_rows = [
-        row.asDict(recursive=True)
-        for row in select_latest_measurements(measurements).collect()
-    ]
-    aggregate_rows = [
-        row.asDict(recursive=True)
-        for row in select_latest_hourly_aggregates(aggregates).collect()
-    ]
+    measurement_rows = collect_utc_rows(
+        select_latest_measurements(measurements), ("measured_at_utc",)
+    )
+    aggregate_rows = collect_utc_rows(
+        select_latest_hourly_aggregates(aggregates),
+        ("window_start", "window_end", "latest_measured_at_utc"),
+    )
 
     return build_air_quality_report(
         locations,

@@ -1,7 +1,6 @@
 import argparse
 import json
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any
 
 from pyspark.sql import SparkSession
@@ -17,6 +16,7 @@ from environmental_streaming.lakehouse.tables import (
 )
 from environmental_streaming.processing.weather_model import WEATHER_IDENTITY_COLUMNS
 from environmental_streaming.runtime.spark import create_spark_session
+from environmental_streaming.runtime.timestamps import utc_datetime_from_micros
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,7 @@ def collect_table_audit(
                 SUM(CASE WHEN {null_identity_condition} THEN 1 ELSE 0 END),
                 0
             ) AS null_identity_rows,
-            MAX({spec.time_column}) AS latest_timestamp
+            unix_micros(MAX({spec.time_column})) AS latest_timestamp
         FROM {spec.table_name}
         """
     ).first()
@@ -113,7 +113,7 @@ def collect_table_audit(
         SELECT
             COUNT(*) AS snapshot_count,
             max_by(snapshot_id, committed_at) AS snapshot_id,
-            MAX(committed_at) AS committed_at,
+            unix_micros(MAX(committed_at)) AS committed_at,
             max_by(operation, committed_at) AS operation
         FROM {spec.table_name}.snapshots
         """
@@ -176,14 +176,11 @@ def collect_iceberg_audit(
     }
 
 
-def _serialize_timestamp(value: object) -> str | None:
+def _serialize_timestamp(value: int | None) -> str | None:
     if value is None:
         return None
 
-    if isinstance(value, datetime):
-        return value.isoformat()
-
-    return str(value)
+    return utc_datetime_from_micros(value).isoformat().replace("+00:00", "Z")
 
 
 def main() -> None:

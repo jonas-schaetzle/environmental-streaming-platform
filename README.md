@@ -211,6 +211,11 @@ Use `--source weather` for both weather tables, or `--source all` for all five
 tables. The default remains `--source openaq` so existing OpenAQ-only deployments
 do not require weather tables.
 
+Audit timestamps (`latest_timestamp`, `latest_snapshot_at`) now use ISO 8601 UTC
+with an explicit `Z`, including available microseconds. Earlier reports contained
+host-local timestamps without offsets. Consumers must accept the UTC suffix and
+regenerate old reports from Iceberg rather than relabel old timestamp strings.
+
 Inspect small-file and snapshot maintenance needs without changing the tables:
 
 ```bash
@@ -257,6 +262,12 @@ python -m environmental_streaming.products.air_quality_insights \
 
 These statuses describe data availability, not health risk or regulatory air-quality
 classification.
+
+Report times, measurement ages and snapshot-age recommendations are independent
+of the Python host timezone. No `TZ=UTC` environment setting is required. Earlier
+air-quality reports could label a host-local time as UTC and misclassify freshness;
+regenerate those reports as well. Table schemas, stored event times, checkpoints
+and producer state are unchanged; no lake migration or replay is needed.
 
 All runtime state, checkpoints, and measurement outputs live under `data/` and are
 excluded from version control. Legacy Parquet outputs and checkpoints may remain

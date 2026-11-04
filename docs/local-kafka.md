@@ -143,7 +143,8 @@ weather was present for all three configured reference locations. Finalized hour
 air-quality output still depends on later event-time input advancing its watermark;
 successful ingestion alone does not make every recent hourly window available.
 
-The existing audit serializes collected Python datetimes without a timezone suffix.
+At the time of the 2026-11-03 check, the audit serialized collected Python
+datetimes without a timezone suffix.
 The first local audit displayed host-local times; the final comparison ran report
 processes with `TZ=UTC` to make their timestamps comparable:
 
@@ -152,9 +153,12 @@ TZ=UTC python -m environmental_streaming.lakehouse.audit --source all
 ```
 
 Row counts, identities and snapshots were identical across both audits; timestamp
-display differed with the process timezone. Explicit timezone-safe report
-serialization needs a focused fix before the joint product relies on these labels.
-No stored event time or source contract was changed by this storage package.
+display differed with the process timezone. The subsequent UTC report fix removes
+the need for this workaround: audit timestamps have explicit `Z` suffixes and
+report ages use actual instants independently of the host timezone. See the
+[report timestamp boundary](architecture.md#report-timestamp-boundary) for output
+compatibility and regeneration of earlier reports. No stored event time or source
+contract was changed by either package.
 
 Still unverified: host reboot, fresh Linux deployment/permissions, disk-loss recovery,
 extended polling-gap catch-up, and the broader weather correction/replay cases in

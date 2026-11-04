@@ -13,6 +13,7 @@ from environmental_streaming.lakehouse.tables import (
     ICEBERG_QUARANTINE_TABLE,
 )
 from environmental_streaming.runtime.spark import create_spark_session
+from environmental_streaming.runtime.timestamps import utc_datetime_from_micros
 
 
 DEFAULT_TARGET_FILE_SIZE_MB = 128
@@ -126,13 +127,15 @@ def collect_table_maintenance_state(
     ).first()
     snapshot_rows = spark.sql(
         f"""
-        SELECT snapshot_id, committed_at, operation
+        SELECT snapshot_id, unix_micros(committed_at) AS committed_at, operation
         FROM {spec.table_name}.snapshots
         ORDER BY committed_at DESC
         """
     ).collect()
 
     snapshots = [_row_to_dict(row) for row in snapshot_rows]
+    for snapshot in snapshots:
+        snapshot["committed_at"] = utc_datetime_from_micros(snapshot["committed_at"])
     snapshot_metrics = _build_snapshot_metrics(
         snapshots,
         older_than=snapshots_older_than,
