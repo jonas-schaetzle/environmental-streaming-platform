@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock
 
 import pytest
@@ -38,7 +38,9 @@ def _audit_spark(
             {
                 "row_count": 26,
                 "null_identity_rows": null_identity_rows,
-                "latest_timestamp": datetime(2026, 9, 21, 8, 0),
+                "latest_timestamp": int(
+                    datetime(2026, 9, 21, 8, tzinfo=timezone.utc).timestamp()
+                ) * 1_000_000,
             }
         ),
         _query_result({"duplicate_rows": duplicate_rows}),
@@ -52,7 +54,9 @@ def _audit_spark(
 def test_collect_table_audit_reports_healthy_table() -> None:
     latest_snapshot = {
         "snapshot_id": 42,
-        "committed_at": datetime(2026, 9, 24, 15, 39),
+        "committed_at": int(
+            datetime(2026, 9, 24, 15, 39, tzinfo=timezone.utc).timestamp()
+        ) * 1_000_000 + 123456,
         "operation": "append",
         "snapshot_count": 2,
     }
@@ -77,14 +81,14 @@ def test_collect_table_audit_reports_healthy_table() -> None:
             "kafka_partition",
             "kafka_offset",
         ],
-        "latest_timestamp": "2026-09-21T08:00:00",
+        "latest_timestamp": "2026-09-21T08:00:00Z",
         "partition": "days(measured_at_utc)",
         "expected_partition": "days(measured_at_utc)",
         "data_file_count": 7,
         "data_file_record_count": 26,
         "snapshot_count": 2,
         "latest_snapshot_id": 42,
-        "latest_snapshot_at": "2026-09-24T15:39:00",
+        "latest_snapshot_at": "2026-09-24T15:39:00.123456Z",
         "latest_snapshot_operation": "append",
     }
     sql_calls = [call.args[0] for call in spark.sql.call_args_list]

@@ -138,6 +138,33 @@ Operational tools have deliberately narrow permissions:
   reports current values, finalized hourly statistics, and data freshness without
   modifying lake state.
 
+### Report Timestamp Boundary
+
+Spark timestamp values are absolute instants, but collecting a `TimestampType`
+directly into Python produces a naive datetime in the Python host timezone.
+The report boundary transfers these values as epoch microseconds using Spark's
+[unix_micros](https://spark.apache.org/docs/4.1.1/api/python/reference/pyspark.sql/api/pyspark.sql.functions.unix_micros.html).
+`runtime/timestamps.py` converts them into timezone-aware UTC datetimes without
+floating-point rounding or a process-wide timezone change. This covers audit
+maxima and snapshot times, maintenance snapshot-age checks, measurement freshness
+and hourly labels in air-quality insights. It does not change streaming transforms.
+
+Audit timestamp fields now end in `Z`; their previous host-local strings had no
+offset. Air-quality and maintenance JSON field names/shapes are preserved, with
+corrected UTC times, ages and recommendations on non-UTC hosts. Regenerate old
+reports from the trusted tables; appending `Z` to an old local-time string is not
+a migration. Stored events, table schemas/identities and processing state remain
+compatible. No replay, data migration or checkpoint reset is needed. Pure report
+builders retain their existing convention that caller-supplied naive datetimes
+mean UTC; collected Spark values now arrive with an explicit UTC timezone.
+
+Verification on 2026-11-04 produced identical audit, air-quality and report-only
+maintenance JSON from the existing five Iceberg tables under UTC, Europe/Berlin
+and America/New_York, using one fixed evaluation time. Hashes of all 348 captured
+warehouse, producer-state and checkpoint files stayed unchanged. Local evidence is
+under ignored `data/verification/utc_reports_20261104/`. Regression tests cover the
+repeated DST hour, microseconds, nulls, freshness cutoffs and snapshot-age cutoffs.
+
 Secrets belong in environment variables or the ignored `.env` file. Producer
 state, Spark checkpoints, Iceberg data, and downloaded measurements belong under
 `data/` and remain untracked.
