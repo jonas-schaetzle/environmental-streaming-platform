@@ -62,6 +62,8 @@
 - Treat idempotency, replay behavior, checkpoints, and late data as explicit design
   concerns whenever ingestion or processing state changes.
 - Prefer structured Spark APIs and the existing canonical model over ad hoc parsing.
+- `infra/aws/` owns the single-machine AWS Terraform configuration and
+  first-boot setup.
 
 ## Data And Secrets
 

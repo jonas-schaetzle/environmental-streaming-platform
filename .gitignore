@@ -48,3 +48,11 @@ metastore_db/
 # ----------------------------
 .DS_Store
 Thumbs.db
+
+# Terraform local state, inputs, plans and provider cache
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan

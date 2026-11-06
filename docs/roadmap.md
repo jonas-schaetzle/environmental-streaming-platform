@@ -165,7 +165,8 @@ actionable alerts with traceable evidence.
 
 Required completion outcomes:
 
-- Terraform and a pinned runtime/bootstrap for a single AWS machine
+- [Single-host Terraform and bootstrap](aws-single-host.md) prepared and tested
+  with a mock AWS provider; live plan and runtime verification remain
 - durable Kafka data, producer state, Iceberg warehouse, and separate checkpoints
   across process/container restart and reboot
 - bounded real API-to-Iceberg runs, restart/replay evidence, and repeatable deployment
