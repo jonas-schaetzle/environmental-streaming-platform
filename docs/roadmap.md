@@ -101,6 +101,8 @@ Already delivered:
   transport-key checks, day partitions, latest timestamps, files, and snapshots
 - timezone-independent report timestamps, air-quality freshness and maintenance
   snapshot-age checks, with explicit UTC audit output
+- a [data-quality alert report](data-quality-alerts.md) for latest-value freshness,
+  hourly coverage and recent quarantine with Kafka lineage
 - a verified active Hamburg source at Sternschanze, retaining Hafen history and
   its city-weather mapping with an explicit station-transition policy
 - a bounded hourly air-quality/weather report with UTC alignment, explicit gaps,
@@ -112,7 +114,6 @@ Next outcomes:
    coverage evidence for the implemented source paths.
 2. Add a small time-series and city-comparison view using the joint hourly report
    and separate latest-value/freshness insights.
-3. Add explainable stale/missing-data and quarantine alerts with traceable evidence.
 
 ### Weather Verification And Next Product Package
 
@@ -155,7 +156,8 @@ newer responses update existing keys, older replays cannot revert them, and inva
 events retain their trace metadata in quarantine. The read-only air-quality join
 is implemented; its [report contract](hourly-environmental-insights.md) handles
 accepted weather corrections on refresh and exposes gaps instead of filling them.
-The graphical view and quality alerts remain subsequent packages.
+The quality alert report is implemented as a separate bounded read. The graphical
+view remains a separate package.
 
 Phase 3 is complete when the platform provides a reproducible environmental view
 that combines air quality and weather, supports comparison over time, and emits

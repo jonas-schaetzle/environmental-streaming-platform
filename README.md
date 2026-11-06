@@ -283,6 +283,18 @@ All runtime state, checkpoints, and measurement outputs live under `data/` and a
 excluded from version control. Legacy Parquet outputs and checkpoints may remain
 there after the Iceberg cutover, but the pipeline no longer updates or deletes them.
 
+## Data-Quality Alerts
+
+Generate the read-only alert report after the streaming jobs:
+
+```bash
+python -m environmental_streaming.products.data_quality_alerts
+```
+
+The report includes stale or missing selected readings, low hourly coverage and
+recent quarantine entries with Kafka lineage. See
+[Data-Quality Alerts](docs/data-quality-alerts.md) for thresholds and refresh commands.
+
 ## Joint Hourly Environmental Report
 
 Combine finalized hourly air-quality statistics with canonical weather on a
