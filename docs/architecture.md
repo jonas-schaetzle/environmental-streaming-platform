@@ -567,6 +567,12 @@ microseconds and are serialized explicitly in UTC.
 See [Hourly Environmental Insights](hourly-environmental-insights.md) for CLI
 commands, temporal semantics, correction behavior, limits and verification.
 
+The [environmental result view](environmental-result-view.md) presents the joint
+hourly JSON and separate latest-measurement JSON using static browser assets in
+`web/`. A loopback HTTP server serves a dedicated output directory. Browser
+interaction reads the published reports, leaving Spark refreshes as bounded
+operator commands.
+
 ## Planned Single-Machine AWS Target
 
 The [delivery plan](delivery-plan.md) records the 2026-12-11 deadline, approximately
@@ -583,13 +589,13 @@ a scheduled product refresh must show its last update and data freshness.
 Kafka log data, producer state, each independent checkpoint and the warehouse need
 durable paths across container restart and host reboot. The Compose broker now has
 an explicit persistent data mount and loopback binding. Existing brokers require
-the documented data-preserving migration before recreation. Access a future result
-view through an SSH tunnel. Resource recreation and recovery of retained state
-are distinct acceptance checks. Termination/storage
-deletion needs an explicit evidence-retention and cleanup decision.
+the documented data-preserving migration before recreation. Access the local result
+view on the host through an SSH tunnel. Resource recreation and recovery of retained
+state are distinct acceptance checks. Termination and storage deletion need an
+explicit evidence-retention and cleanup decision.
 
 The bounded joint product above can run on the same host after the streaming jobs.
-Scheduling, view serving and runtime sizing remain deployment work. Regenerating
-the report picks up accepted source snapshots without introducing another stateful
-stream join. Cloud provisioning still requires a concrete cost calculation and
-explicit approval.
+Scheduling, starting the loopback view server and runtime sizing remain deployment
+work. Regenerating the report picks up accepted source snapshots without introducing
+another stateful stream join. Cloud provisioning still requires a concrete cost
+calculation and explicit approval.

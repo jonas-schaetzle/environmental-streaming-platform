@@ -17,6 +17,7 @@ stores canonical, quarantined, and hourly aggregate data in Apache Iceberg.
 - [Local Kafka Storage And Restart](docs/local-kafka.md)
 - [Curated Source Coverage And Station History](docs/data-sources.md)
 - [Hourly Air-Quality And Weather Insights](docs/hourly-environmental-insights.md)
+- [Environmental Result View](docs/environmental-result-view.md)
 
 ## Architecture
 
@@ -302,6 +303,28 @@ must already exist; Kafka can remain stopped.
 
 See [Hourly Insights](docs/hourly-environmental-insights.md) for coverage meanings,
 station-comparison limits, attribution and reproduction with snapshot IDs.
+
+## Environmental Result View
+
+The local browser view compares station coverage, the latest selected OpenAQ
+measurements and aligned hourly air-quality and weather series. From the repository
+root, with the Python environment active:
+
+```bash
+mkdir -p data/products/view
+cp web/index.html web/view.css web/view.js data/products/view/
+python -m environmental_streaming.products.hourly_environmental_insights \
+  > data/products/hourly-view.tmp && \
+  mv data/products/hourly-view.tmp data/products/view/hourly_environmental_insights.json
+python -m environmental_streaming.products.air_quality_insights \
+  > data/products/latest-view.tmp && \
+  mv data/products/latest-view.tmp data/products/view/air_quality_insights.json
+python -m http.server 8765 --bind 127.0.0.1 --directory data/products/view
+```
+
+Open [the local view](http://127.0.0.1:8765/) in a browser.
+See [Environmental Result View](docs/environmental-result-view.md) for
+refresh, time alignment and how to interpret station coverage.
 
 ## Weather Source Check
 

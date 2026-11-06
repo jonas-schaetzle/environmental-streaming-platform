@@ -136,8 +136,9 @@ ongoing Git authorization. The maintained roadmap and README link this plan and
 the [AWS preflight](aws-preflight.md).
 
 The bounded joint product is implemented with snapshot-pinned reads, explicit
-missing hours and tested correction refresh. The next product packages are the
-small result view and data-quality alerts. The local persistence package establishes
+missing hours and tested correction refresh. The [local result view](environmental-result-view.md)
+shows coverage, latest measurements and a comparison for a shared hour. The next
+product package is data-quality alerts. The local persistence package establishes
 broker restart evidence and safe Kafka storage; see [Local Kafka](local-kafka.md).
 Broader source coverage and host-reboot evidence remain required. AWS billing/credit
 confirmation can proceed separately and does not block cost-free local development.
