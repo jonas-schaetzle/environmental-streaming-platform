@@ -105,14 +105,14 @@ Already delivered:
   its city-weather mapping with an explicit station-transition policy
 - a bounded hourly air-quality/weather report with UTC alignment, explicit gaps,
   station coverage, accepted weather lineage and snapshot-based reproduction
+- a [local result view](environmental-result-view.md) with station coverage,
+  latest measurements, UTC time series and a comparison for a shared hour
 
 Next outcomes:
 
 1. Complete the free AWS account/resource/billing preflight and local restart and
    coverage evidence for the implemented source paths.
-2. Add a small time-series and city-comparison view using the joint hourly report
-   and separate latest-value/freshness insights.
-3. Add explainable stale/missing-data and quarantine alerts with traceable evidence.
+2. Add explainable stale/missing-data and quarantine alerts with traceable evidence.
 
 ### Weather Verification And Next Product Package
 
@@ -155,7 +155,8 @@ newer responses update existing keys, older replays cannot revert them, and inva
 events retain their trace metadata in quarantine. The read-only air-quality join
 is implemented; its [report contract](hourly-environmental-insights.md) handles
 accepted weather corrections on refresh and exposes gaps instead of filling them.
-The graphical view and quality alerts remain subsequent packages.
+The result view consumes both reporting products. The quality alert report
+remains the next product package.
 
 Phase 3 is complete when the platform provides a reproducible environmental view
 that combines air quality and weather, supports comparison over time, and emits

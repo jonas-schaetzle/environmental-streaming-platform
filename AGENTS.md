@@ -50,6 +50,7 @@
 - `src/environmental_streaming/products/hourly_environmental_insights.py` owns the
   bounded hourly air-quality/weather report, snapshot-pinned reads, UTC alignment,
   station-level coverage and reproducible report inputs.
+- `web/` owns the static result view of the existing product JSON reports.
 - `src/environmental_streaming/diagnostics/kafka_consumer.py` is a diagnostic reader
   and must not commit consumer offsets.
 - `src/environmental_streaming/runtime/spark.py` owns local Spark session and Java

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Compare hourly air quality and weather across monitoring stations.">
+  <title>Environmental Observatory</title>
+  <link rel="stylesheet" href="view.css">
+  <script src="view.js" defer></script>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">ENVIRONMENTAL STREAMING PLATFORM</p>
+      <h1>Environmental Observatory</h1>
+      <p>Air quality at selected monitoring stations, alongside local model weather.</p>
+      <p id="hourly-status" class="metadata" role="status">Loading the hourly report…</p>
+    </div>
+  </header>
+  <main class="wrap" id="dashboard" hidden>
+    <section aria-labelledby="coverage-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">01 / STATION COVERAGE</p>
+          <h2 id="coverage-title">Station comparison</h2>
+        </div>
+        <p id="latest-status" class="metadata" role="status">Loading latest measurements…</p>
+      </div>
+      <div id="stations" class="stations"></div>
+      <p class="note">Coverage counts hours with available data. A missing finalized hour may
+        still be waiting for later input. Individual stations represent their own surroundings.</p>
+    </section>
+    <section aria-labelledby="series-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">02 / TIME SERIES</p>
+          <h2 id="series-title">Hourly trends</h2>
+        </div>
+        <label>Weather variable <select id="weather-variable"></select></label>
+      </div>
+      <ul id="legend" class="legend" aria-label="Chart legend"></ul>
+      <div class="charts">
+        <div class="panel">
+          <h3 id="air-title"></h3>
+          <p class="note">Finalized hourly means of ingested observations.</p>
+          <div id="air-chart"></div>
+        </div>
+        <div class="panel">
+          <h3 id="weather-title"></h3>
+          <p class="note" id="weather-note"></p>
+          <div id="weather-chart"></div>
+        </div>
+      </div>
+      <p class="note">Both charts use the start of the shared UTC hour. Breaks show missing
+        values. Dots also show isolated values.</p>
+    </section>
+    <section aria-labelledby="hour-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">03 / SHARED HOUR</p>
+          <h2 id="hour-title">Compare a single hour</h2>
+        </div>
+        <label>Hour starting (UTC) <select id="selected-hour"></select></label>
+      </div>
+      <div class="panel table-scroll" tabindex="0" role="region" aria-labelledby="hour-title">
+        <table>
+          <caption id="hour-caption"></caption>
+          <thead>
+            <tr>
+              <th scope="col">City / station</th>
+              <th scope="col" id="air-column"></th>
+              <th scope="col">Observations</th>
+              <th scope="col" id="weather-column"></th>
+              <th scope="col">Weather coverage</th>
+            </tr>
+          </thead>
+          <tbody id="hour-values"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <footer class="wrap">
+    Sources: <a href="https://openaq.org/">OpenAQ and upstream providers</a> ·
+    <a href="https://open-meteo.com/">Open-Meteo</a>.
+    <span id="weather-dataset"></span>
+  </footer>
+</body>
+</html>
