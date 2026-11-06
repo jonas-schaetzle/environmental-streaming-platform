@@ -101,6 +101,8 @@ Already delivered:
   transport-key checks, day partitions, latest timestamps, files, and snapshots
 - timezone-independent report timestamps, air-quality freshness and maintenance
   snapshot-age checks, with explicit UTC audit output
+- a [data-quality alert report](data-quality-alerts.md) for latest-value freshness,
+  hourly coverage and recent quarantine with Kafka lineage
 - a verified active Hamburg source at Sternschanze, retaining Hafen history and
   its city-weather mapping with an explicit station-transition policy
 - a bounded hourly air-quality/weather report with UTC alignment, explicit gaps,
@@ -108,13 +110,10 @@ Already delivered:
 - a [local result view](environmental-result-view.md) with station coverage,
   latest measurements, UTC time series and a comparison for a shared hour
 
-Next outcomes:
+Remaining outcomes include the free AWS account and billing preflight and
+broader local restart and coverage evidence for the implemented source paths.
 
-1. Complete the free AWS account/resource/billing preflight and local restart and
-   coverage evidence for the implemented source paths.
-2. Add explainable stale/missing-data and quarantine alerts with traceable evidence.
-
-### Weather Verification And Next Product Package
+### Weather Verification
 
 The [implemented weather architecture](architecture.md#weather-ingestion)
 defines Open-Meteo hourly model data, a dedicated event contract, dataset-aware
@@ -155,8 +154,8 @@ newer responses update existing keys, older replays cannot revert them, and inva
 events retain their trace metadata in quarantine. The read-only air-quality join
 is implemented; its [report contract](hourly-environmental-insights.md) handles
 accepted weather corrections on refresh and exposes gaps instead of filling them.
-The result view consumes both reporting products. The quality alert report
-remains the next product package.
+The result view consumes the hourly and latest-measurement reports. The quality
+alert report runs separately and records the evidence for each trigger.
 
 Phase 3 is complete when the platform provides a reproducible environmental view
 that combines air quality and weather, supports comparison over time, and emits

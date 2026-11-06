@@ -45,6 +45,8 @@
   table-health and backfill validation.
 - `src/environmental_streaming/lakehouse/maintenance.py` owns Iceberg data-file
   compaction and explicit snapshot-expiration workflows.
+- `src/environmental_streaming/products/data_quality_alerts.py` owns the bounded
+  read-only alert report and its freshness, coverage and quarantine evidence.
 - `src/environmental_streaming/products/air_quality_insights.py` owns read-only
   location freshness and latest-trend product generation from Iceberg.
 - `src/environmental_streaming/products/hourly_environmental_insights.py` owns the

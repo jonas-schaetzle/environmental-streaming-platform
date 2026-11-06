@@ -542,6 +542,13 @@ deployment require an explicit compatibility and migration decision. A second
 stream processor such as Flink remains conditional on a concrete low-latency use
 case that justifies another runtime and state model.
 
+## Data-Quality Alert Report
+
+The [data-quality alert product](data-quality-alerts.md) combines existing
+freshness and hourly coverage reports with Kafka-timestamp-bounded counts in
+both Iceberg quarantine tables. Each alert includes the triggering evidence.
+The bounded read creates no sink or checkpoint.
+
 ## Joint Hourly Environmental Product
 
 `products/hourly_environmental_insights.py` builds a bounded, read-only comparison

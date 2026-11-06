@@ -80,7 +80,8 @@ architecture changes.
 - Prefer a small locally served view of the generated report. Refresh after bounded
   Spark jobs; show freshness instead of promising continuous low latency. No new
   external service is needed. Select the view technology in its own small package.
-- Alerts describe data quality, not medical or regulatory air-quality thresholds.
+- The [data-quality alert report](data-quality-alerts.md) uses operational freshness,
+  coverage and quarantine thresholds.
 - Pin the tested Linux/Python/Java/container versions and persist local Terraform
   state outside version control. Keep source API credentials off Terraform
   variables, state, user-data, and committed files; inject them privately at runtime.
@@ -136,9 +137,11 @@ ongoing Git authorization. The maintained roadmap and README link this plan and
 the [AWS preflight](aws-preflight.md).
 
 The bounded joint product is implemented with snapshot-pinned reads, explicit
-missing hours and tested correction refresh. The [local result view](environmental-result-view.md)
-shows coverage, latest measurements and a comparison for a shared hour. The next
-product package is data-quality alerts. The local persistence package establishes
-broker restart evidence and safe Kafka storage; see [Local Kafka](local-kafka.md).
+missing hours and tested correction refresh. The
+[local result view](environmental-result-view.md) shows coverage, latest measurements
+and a comparison for a shared hour. The [alert report](data-quality-alerts.md)
+provides evidence for stale, missing and quarantined data. The local persistence
+package establishes broker restart evidence and safe Kafka storage. See
+[Local Kafka](local-kafka.md).
 Broader source coverage and host-reboot evidence remain required. AWS billing/credit
 confirmation can proceed separately and does not block cost-free local development.
