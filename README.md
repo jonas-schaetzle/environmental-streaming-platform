@@ -14,6 +14,7 @@ stores canonical, quarantined, and hourly aggregate data in Apache Iceberg.
 - [Development Workflow](docs/development-workflow.md)
 - [Delivery Plan Through 11 December 2026](docs/delivery-plan.md)
 - [Free AWS Preflight And Cost Planning](docs/aws-preflight.md)
+- [AWS Single-Host Deployment](docs/aws-single-host.md)
 - [Local Kafka Storage And Restart](docs/local-kafka.md)
 - [Curated Source Coverage And Station History](docs/data-sources.md)
 - [Hourly Air-Quality And Weather Insights](docs/hourly-environmental-insights.md)

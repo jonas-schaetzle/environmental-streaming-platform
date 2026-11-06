@@ -571,7 +571,9 @@ commands, temporal semantics, correction behavior, limits and verification.
 
 The [delivery plan](delivery-plan.md) records the 2026-12-11 deadline, approximately
 six maintainer hours per week, and EUR 20 total additional gross project budget.
-Terraform and the cloud runtime are not implemented yet. The
+The [single-host Terraform configuration](aws-single-host.md) defines the
+Frankfurt EC2 host, network and first-boot package setup. The cloud runtime
+still needs integration verification. The
 [free AWS preflight](aws-preflight.md) records the initial checks and approval gate;
 no chargeable provisioning is authorized by the architecture description.
 
