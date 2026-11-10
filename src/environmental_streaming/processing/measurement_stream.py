@@ -200,14 +200,20 @@ def merge_iceberg_hourly_aggregate_batch(
     aggregates: DataFrame,
     _batch_id: int,
 ) -> None:
-    merge_iceberg_batch(
-        aggregates,
-        ICEBERG_HOURLY_AGGREGATE_TABLE,
-        ICEBERG_HOURLY_AGGREGATE_BATCH_VIEW,
-        HOURLY_AGGREGATE_COLUMNS,
-        HOURLY_AGGREGATE_IDENTITY_COLUMNS,
-        HOURLY_AGGREGATE_UPDATE_COLUMNS,
-    )
+    batch = aggregates.persist()
+    try:
+        # Watermark progress can produce an empty output batch.
+        if not batch.isEmpty():
+            merge_iceberg_batch(
+                batch,
+                ICEBERG_HOURLY_AGGREGATE_TABLE,
+                ICEBERG_HOURLY_AGGREGATE_BATCH_VIEW,
+                HOURLY_AGGREGATE_COLUMNS,
+                HOURLY_AGGREGATE_IDENTITY_COLUMNS,
+                HOURLY_AGGREGATE_UPDATE_COLUMNS,
+            )
+    finally:
+        batch.unpersist()
 
 
 def write_iceberg_stream(

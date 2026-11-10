@@ -109,6 +109,8 @@ def test_merge_iceberg_hourly_aggregate_batch_updates_existing_window() -> None:
     merge_result = spark.sql.return_value
     aggregates = MagicMock(spec=DataFrame)
     aggregates.sparkSession = spark
+    aggregates.persist.return_value = aggregates
+    aggregates.isEmpty.return_value = False
 
     merge_iceberg_hourly_aggregate_batch(aggregates, 9)
 
@@ -131,6 +133,19 @@ def test_merge_iceberg_hourly_aggregate_batch_updates_existing_window() -> None:
     spark.catalog.dropTempView.assert_called_once_with(
         "iceberg_hourly_measurement_aggregate_batch"
     )
+    aggregates.unpersist.assert_called_once_with()
+
+
+def test_merge_iceberg_hourly_aggregate_batch_skips_empty_output() -> None:
+    aggregates = MagicMock(spec=DataFrame)
+    aggregates.persist.return_value = aggregates
+    aggregates.isEmpty.return_value = True
+
+    merge_iceberg_hourly_aggregate_batch(aggregates, 10)
+
+    aggregates.createOrReplaceTempView.assert_not_called()
+    aggregates.sparkSession.sql.assert_not_called()
+    aggregates.unpersist.assert_called_once_with()
 
 
 def test_parse_kafka_measurements_extracts_metadata_and_measurement(

@@ -15,8 +15,9 @@ publishes hourly comparisons and data-quality alerts.
 2. Expand **Trace this hour** to find the accepted weather record's Kafka topic,
    partition and offset. Download the displayed report with both Iceberg snapshot
    IDs for [reproduction](docs/hourly-environmental-insights.md#snapshots-corrections-and-reproduction).
-3. Review the [Kafka restart evidence](docs/local-kafka.md#verification-evidence),
-   [snapshot and correction checks](docs/hourly-environmental-insights.md#verification),
+3. Review the [event-time verification](docs/event-time-verification.md),
+   [Kafka restart evidence](docs/local-kafka.md#verification-evidence),
+   [weather correction checks](docs/hourly-environmental-insights.md#verification),
    and [alert evidence](docs/data-quality-alerts.md#local-verification).
    The [AWS runbook](docs/aws-single-host.md) records the single-host deployment
    plan and its remaining acceptance checks.
@@ -202,9 +203,12 @@ python -m environmental_streaming.processing.measurement_stream
 
 Valid measurements are aggregated into one-hour event-time windows per source,
 location, parameter, and unit. Each finalized window contains the measurement count,
-average, minimum, maximum, and latest measurement timestamp. Spark waits up to two
-hours of event time for late measurements. Older events remain in the canonical sink
-but no longer update a finalized aggregate window.
+average, minimum, maximum, and latest measurement timestamp. A two-hour watermark
+advances with the latest processed measurement time. The canonical sink retains
+valid late records after the hourly window closes. The hourly sink skips Iceberg
+writes when a batch has no finalized output. The
+[event-time verification](docs/event-time-verification.md) demonstrates this on
+Kafka, Spark and Iceberg and compares the result with a read-only recalculation.
 
 Canonical measurements are written to `local.lake.canonical_measurements` in the
 local Iceberg warehouse. Each micro-batch is merged by Kafka topic, partition, and
