@@ -62,6 +62,15 @@ table { width: 100%; border-collapse: collapse; text-align: left; font-size: .9r
 caption { text-align: left; color: var(--muted); padding-bottom: .5rem; }
 td, th { padding: .45rem .7rem .45rem 0; border-bottom: 1px solid var(--border); }
 tbody tr:last-child > * { border-bottom: 0; }
+.trace { margin-top: .85rem; }
+.trace summary { cursor: pointer; font-weight: 750; color: var(--accent); }
+.trace-heading { margin-top: .8rem; }
+.trace-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: .8rem 1.2rem; }
+.trace-fields { margin: .35rem 0 .65rem; font-size: .86rem; }
+.trace-fields dt { margin-top: .35rem; color: var(--muted); }
+.trace-fields dd { margin: 0; overflow-wrap: anywhere; }
+.trace-inputs { border-top: 1px solid var(--border); padding-top: .7rem; }
 footer { color: var(--muted); padding-block: .5rem 1.4rem; font-size: .86rem; }
 a { color: var(--accent); }
 :focus-visible { outline: 2px solid #1269a7; outline-offset: 3px; }
