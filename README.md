@@ -2,10 +2,24 @@
 
 [![CI](https://github.com/jonas-schaetzle/environmental-streaming-platform/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/jonas-schaetzle/environmental-streaming-platform/actions/workflows/ci.yml)
 
-Production-oriented streaming data platform for real environmental measurements.
-The current implementation continuously ingests OpenAQ data, publishes canonical
-measurement events to Kafka, processes them with Spark Structured Streaming, and
-stores canonical, quarantined, and hourly aggregate data in Apache Iceberg.
+Environmental data platform that combines OpenAQ station observations with
+Open-Meteo model weather for Munich, Stuttgart, and Hamburg. It processes both
+feeds through Kafka and Spark Structured Streaming into Apache Iceberg, then
+publishes hourly comparisons and data-quality alerts.
+
+## Portfolio Walkthrough
+
+1. Open the [result view](#environmental-result-view), select a UTC hour and
+   compare the stations. Coverage counts and chart gaps show where the inputs
+   are sparse.
+2. Expand **Trace this hour** to find the accepted weather record's Kafka topic,
+   partition and offset. Download the displayed report with both Iceberg snapshot
+   IDs for [reproduction](docs/hourly-environmental-insights.md#snapshots-corrections-and-reproduction).
+3. Review the [Kafka restart evidence](docs/local-kafka.md#verification-evidence),
+   [snapshot and correction checks](docs/hourly-environmental-insights.md#verification),
+   and [alert evidence](docs/data-quality-alerts.md#local-verification).
+   The [AWS runbook](docs/aws-single-host.md) records the single-host deployment
+   plan and its remaining acceptance checks.
 
 ## Project Documentation
 
@@ -22,20 +36,25 @@ stores canonical, quarantined, and hourly aggregate data in Apache Iceberg.
 
 ## Architecture
 
-```text
-OpenAQ API
-    |
-    v
-OpenAQ Kafka Producer
-    |
-    v
-environment.measurements.canonical
-    |
-    v
-Spark Structured Streaming
-    |-- valid events ------> local.lake.canonical_measurements
-    |-- hourly aggregates -> local.lake.hourly_measurement_aggregates
-    `-- invalid events ----> local.lake.quarantine_measurements
+```mermaid
+flowchart TD
+    AQ["OpenAQ station observations"] --> AQT["Kafka measurement topic"]
+    OM["Open-Meteo model weather"] --> OMT["Kafka weather topic"]
+    AQT --> AIR["Spark air quality queries"]
+    OMT --> WEATHER["Spark weather queries"]
+    AIR --> CANONICAL["Iceberg canonical measurements"]
+    AIR --> HOURLY["Iceberg finalized hourly aggregates"]
+    WEATHER --> CONTEXT["Iceberg canonical weather"]
+    AIR --> QUARANTINE["Separate Iceberg quarantine tables"]
+    WEATHER --> QUARANTINE
+    CANONICAL --> LATEST["Latest readings"]
+    HOURLY --> JOIN["Snapshot-pinned hourly comparison"]
+    CONTEXT --> JOIN
+    LATEST --> VIEW["Local result view"]
+    JOIN --> VIEW
+    LATEST --> ALERTS["Data-quality alerts"]
+    JOIN --> ALERTS
+    QUARANTINE --> ALERTS
 ```
 
 Kafka offsets and Spark checkpoints make the processing restartable. OpenAQ
@@ -320,8 +339,9 @@ station-comparison limits, attribution and reproduction with snapshot IDs.
 ## Environmental Result View
 
 The local browser view compares station coverage, the latest selected OpenAQ
-measurements and aligned hourly air-quality and weather series. From the repository
-root, with the Python environment active:
+measurements and aligned hourly air-quality and weather series. Expand
+**Trace this hour** for source evidence and the exact hourly JSON displayed.
+From the repository root, with the Python environment active:
 
 ```bash
 mkdir -p data/products/view

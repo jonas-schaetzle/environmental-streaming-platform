@@ -77,6 +77,29 @@
           <tbody id="hour-values"></tbody>
         </table>
       </div>
+      <details class="panel trace">
+        <summary>Trace this hour</summary>
+        <div class="section-heading trace-heading">
+          <p class="note" id="trace-selection"></p>
+          <label>Station to trace <select id="trace-station"></select></label>
+        </div>
+        <div class="trace-grid">
+          <div>
+            <h3>OpenAQ hourly aggregate</h3>
+            <dl id="trace-air" class="trace-fields"></dl>
+          </div>
+          <div>
+            <h3>Open-Meteo record</h3>
+            <dl id="trace-weather" class="trace-fields"></dl>
+          </div>
+        </div>
+        <div class="trace-inputs">
+          <h3>Iceberg report inputs</h3>
+          <p class="note">Each table was read at its own snapshot.</p>
+          <dl id="trace-snapshots" class="trace-fields"></dl>
+          <a id="report-download" download="hourly_environmental_insights.json">Download this hourly report (JSON)</a>
+        </div>
+      </details>
     </section>
   </main>
   <footer class="wrap">

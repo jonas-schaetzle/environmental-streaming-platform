@@ -43,10 +43,18 @@ function stationColor(node, index) {
   return node;
 }
 
-async function loadReport(file) {
+async function fetchReport(file) {
   const response = await fetch(file, { cache: "no-store" });
   if (!response.ok) throw new Error(`HTTP ${response.status} for ${file}`);
-  return response.json();
+  return response;
+}
+
+function preserveReportId(key, value, context) {
+  if ((key === "snapshot_id" || key === "offset") && typeof value === "number") {
+    // Keep the original decimal digits for IDs outside the safe integer range.
+    return context?.source ?? (Number.isSafeInteger(value) ? String(value) : "See hourly JSON");
+  }
+  return value;
 }
 
 function renderStations(report, latest) {
@@ -166,7 +174,40 @@ function renderHour(report, selectedIndex, weatherKey) {
   byId("hour-values").replaceChildren(...rows);
 }
 
-function showHourly(report) {
+function renderFields(id, fields) {
+  byId(id).replaceChildren(...fields.flatMap(([label, value]) =>
+    [element("dt", label), element("dd", String(value))]));
+}
+
+function renderTrace(station, selectedIndex, weatherKey) {
+  const hour = station.hours[selectedIndex];
+  const weather = hour.weather[weatherKey];
+  byId("trace-selection").textContent =
+    `${fullUtc(hour.window_start_utc)} · ${weatherVariables[weatherKey].label}`;
+  const airFields = [
+    ["OpenAQ station ID", station.location_id],
+    ["Status", hour.air_quality ? "Finalized" : "No finalized hour"],
+  ];
+  if (hour.air_quality) {
+    airFields.push(["Latest included observation (UTC)", hour.air_quality.latest_measured_at_utc]);
+  }
+  renderFields("trace-air", airFields);
+  const weatherFields = [["Mapped model location", station.weather_location_id]];
+  if (weather) {
+    weatherFields.push(
+      ["Valid at (UTC)", weather.valid_at_utc],
+      ["Fetched at (UTC)", weather.fetched_at_utc],
+      ["Kafka topic", weather.kafka.topic],
+      ["Partition", weather.kafka.partition],
+      ["Offset", weather.kafka.offset],
+    );
+  } else {
+    weatherFields.push(["Status", "Missing for this hour and variable"]);
+  }
+  renderFields("trace-weather", weatherFields);
+}
+
+function showHourly(report, reportJson) {
   const pollutant = pollutants[report.parameter];
   if (report.version !== 1 || !pollutant || !report.locations[0]?.hours.length) {
     throw new Error("Unsupported hourly report");
@@ -186,6 +227,9 @@ function showHourly(report) {
 
   const hourPicker = byId("selected-hour");
   const weatherPicker = byId("weather-variable");
+  const stationPicker = byId("trace-station");
+  stationPicker.replaceChildren(...report.locations.map((station) =>
+    new Option(station.name, station.location_id)));
   weatherPicker.replaceChildren(...Object.entries(weatherVariables).map(([key, { label }]) =>
     new Option(label, key)));
   const hours = report.locations[0].hours;
@@ -194,6 +238,17 @@ function showHourly(report) {
   const latestFinalized = hours.findLastIndex((_, index) =>
     report.locations.some((station) => station.hours[index].air_quality));
   hourPicker.selectedIndex = latestFinalized === -1 ? hours.length - 1 : latestFinalized;
+
+  renderFields("trace-snapshots", [report.inputs.air_quality, report.inputs.weather]
+    .map(({ table, snapshot_id: snapshot }) => [table, snapshot ?? "No snapshot"]));
+  // Download the report currently on screen, even if the server refreshes its file.
+  byId("report-download").href = URL.createObjectURL(
+    new Blob([reportJson], { type: "application/json" }));
+
+  function drawTrace() {
+    renderTrace(report.locations[stationPicker.selectedIndex], hourPicker.selectedIndex,
+      weatherPicker.value);
+  }
 
   function draw() {
     const selectedIndex = hourPicker.selectedIndex;
@@ -209,10 +264,12 @@ function showHourly(report) {
     renderChart(byId("weather-chart"), report, weatherTitle, (hour) => hour.weather[key]?.value,
       selectedIndex);
     renderHour(report, selectedIndex, key);
+    drawTrace();
   }
 
   hourPicker.addEventListener("change", draw);
   weatherPicker.addEventListener("change", draw);
+  stationPicker.addEventListener("change", drawTrace);
   renderStations(report, null);
   draw();
   byId("dashboard").hidden = false;
@@ -221,8 +278,10 @@ function showHourly(report) {
 async function main() {
   let hourly;
   try {
-    hourly = await loadReport("hourly_environmental_insights.json");
-    showHourly(hourly);
+    const response = await fetchReport("hourly_environmental_insights.json");
+    const reportJson = await response.text();
+    hourly = JSON.parse(reportJson, preserveReportId);
+    showHourly(hourly, reportJson);
   } catch (error) {
     byId("hourly-status").textContent = "Hourly report unavailable. Generate the report and reload.";
     console.error(error);
@@ -230,7 +289,8 @@ async function main() {
   }
 
   try {
-    const latest = await loadReport("air_quality_insights.json");
+    const response = await fetchReport("air_quality_insights.json");
+    const latest = await response.json();
     renderStations(hourly, latest);
     byId("latest-status").textContent =
       `Latest report generated ${fullUtc(latest.generated_at_utc)} · ` +
