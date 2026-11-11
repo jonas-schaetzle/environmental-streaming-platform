@@ -158,6 +158,30 @@ docker exec environmental-streaming-kafka /opt/kafka/bin/kafka-topics.sh \
   --replication-factor 1
 ```
 
+## Local Collection Run
+
+With the virtual environment active, the OpenAQ key loaded and the local broker
+healthy, create both the measurement topic above and the
+[weather topic](#weather-kafka-replay). Then run a bounded collection session.
+
+```bash
+python scripts/collect_local.py --cycles 8 --interval-seconds 900
+```
+
+The runner polls both sources in each cycle and then drains the measurement and
+weather topics into Iceberg. It uses the existing producer state and Spark
+checkpoints. The default is one cycle. Weather requests overlap the previous six
+hours by default, with `--weather-past-hours` available to change the overlap.
+OpenAQ polls the latest readings, so run multiple cycles over the period you want
+to observe.
+
+Run one collection session at a time. Wait for manual producer or Spark jobs in
+the same checkout to finish before starting the runner. Each step records its
+stdout and stderr under ignored `data/collection/`. A producer failure leaves the
+other source and the Spark drain available. The runner exits with a nonzero status
+if any step fails. Refresh the [result view](#environmental-result-view) after
+the run to see the current coverage.
+
 ## Running The Pipeline
 
 Run one ingestion cycle for the curated locations in
