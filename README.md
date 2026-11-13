@@ -19,6 +19,8 @@ publishes hourly comparisons and data-quality alerts.
    [Kafka restart evidence](docs/local-kafka.md#verification-evidence),
    [weather correction checks](docs/hourly-environmental-insights.md#verification),
    and [alert evidence](docs/data-quality-alerts.md#local-verification).
+   The [collection evidence](docs/collection-evidence.md) reconciles one run
+   from Kafka to Iceberg and gives a reproducible window for the station comparison.
    The [AWS runbook](docs/aws-single-host.md) records the single-host deployment
    plan and its remaining acceptance checks.
 
