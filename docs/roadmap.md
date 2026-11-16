@@ -137,13 +137,14 @@ The [source coverage review](data-sources.md) replaces the stale Hamburg Hafen
 default with Sternschanze while preserving both identities and historical context.
 Some sensors still expose old values even at an otherwise current station;
 freshness remains a per-parameter concern, and latest polling does not prove
-complete hourly coverage.
+complete hourly coverage. The [weather correction verification](weather-correction-verification.md)
+shows a newer receipt replacing one canonical value for the same hour through
+Kafka and Spark, with the accepted record's lineage.
 
 Remaining verification:
 
 1. Broaden verification of the real multi-location source-to-Kafka-to-Iceberg path,
-   including restart behavior, replay with new Kafka offsets, changed values for
-   the same hour, out-of-order responses,
+   including restart behavior, replay with new Kafka offsets, out-of-order responses,
    and explicit catch-up after a polling gap. Extend coverage verification beyond
    the existing read-only identity/partition audit and document operating commands
    in the README.

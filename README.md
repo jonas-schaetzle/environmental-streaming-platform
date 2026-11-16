@@ -17,7 +17,7 @@ publishes hourly comparisons and data-quality alerts.
    IDs for [reproduction](docs/hourly-environmental-insights.md#snapshots-corrections-and-reproduction).
 3. Review the [event-time verification](docs/event-time-verification.md),
    [Kafka restart evidence](docs/local-kafka.md#verification-evidence),
-   [weather correction checks](docs/hourly-environmental-insights.md#verification),
+   [weather correction checks](docs/weather-correction-verification.md),
    and [alert evidence](docs/data-quality-alerts.md#local-verification).
    The [collection evidence](docs/collection-evidence.md) reconciles one run
    from Kafka to Iceberg and gives a reproducible window for the station comparison.
