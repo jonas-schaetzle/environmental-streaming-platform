@@ -7,11 +7,12 @@ Iceberg. Both records describe the same hour and have the same business key
 record changes the temperature by 2 °C and its fetch time by two minutes. These
 changes simulate a correction.
 
-The script starts an availableNow query after each publication. Both runs use the
-same checkpoint and each consumes one input record. It checks that Iceberg keeps
-one canonical row, commits a new snapshot, and stores the corrected value, fetch
-time and Kafka record identity. It retains the prior and current values in the
-report for comparison.
+The script then replays the correction and the archived version, in that order.
+It starts an availableNow query after each publication. All four runs use the
+same checkpoint and each consumes one input record at a new Kafka offset.
+Iceberg keeps one canonical row throughout. The correction creates a new snapshot
+and updates the row's value, fetch time and Kafka identity. Both replays leave
+those accepted fields in place.
 
 ## Run Locally
 
@@ -26,8 +27,8 @@ python scripts/verify_weather_correction.py "$canonical_weather_file"
 
 The script creates a new topic and writes its own warehouse, checkpoint and
 `report.json` under ignored `data/verification/`. Stop the isolated broker after
-the run. The report records the two snapshots and the query, run and Kafka record
-identities.
+the run. The report records the snapshot, query ID, run ID, consumed offset and
+stored Kafka identity after each step.
 
 ## Verified Result
 
@@ -42,3 +43,17 @@ The 2026-11-16 run used an archived Munich temperature valid at 12:00 UTC on
 The second run resumed the same query checkpoint, committed a new Iceberg
 snapshot and preserved the original business key. The canonical row now carries
 the correction's fetch time and Kafka identity.
+
+The 2026-11-17 run repeated the correction and checked both replay orders.
+Spark consumed one record in each run from the same checkpoint on partition 0.
+
+| Step | Consumed Kafka offset | Stored Kafka offset | Stored temperature | Canonical rows |
+|---|---:|---:|---:|---:|
+| Archived record | 0 | 0 | 20.5 °C | 1 |
+| Simulated correction | 1 | 1 | 22.5 °C | 1 |
+| Identical replay of the correction | 2 | 1 | 22.5 °C | 1 |
+| Replay of the older record | 3 | 1 | 22.5 °C | 1 |
+
+Iceberg committed an overwrite snapshot for each replay in this run. Each
+snapshot replaced one physical row and retained the same canonical row and
+Kafka identity.

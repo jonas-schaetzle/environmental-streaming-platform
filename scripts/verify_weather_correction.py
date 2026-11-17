@@ -1,4 +1,4 @@
-"""Verify that a newer weather receipt updates one canonical Iceberg row."""
+"""Verify weather correction and replay against the canonical Iceberg table."""
 
 import argparse
 import json
@@ -68,7 +68,7 @@ def verify(spark: SparkSession, original: dict, run: Path) -> dict:
     valid = filter_valid_weather_observations(parse_kafka_weather(messages))
     checkpoint = str(run / "checkpoint")
 
-    def send_and_process(event: dict) -> dict:
+    def send_and_process(event: dict, expected_offset: int) -> dict:
         published = produce_events(
             [event],
             bootstrap_servers=BROKER,
@@ -78,13 +78,21 @@ def verify(spark: SparkSession, original: dict, run: Path) -> dict:
         assert published == 1
         query = write_weather_canonical_stream(valid, checkpoint)
         query.awaitTermination()
-        input_rows = sum(batch["numInputRows"] for batch in query.recentProgress)
-        assert input_rows == 1, f"Expected one Kafka input row, consumed {input_rows}."
+        batches = [batch for batch in query.recentProgress if batch["numInputRows"]]
+        assert len(batches) == 1 and batches[0]["numInputRows"] == 1
+        source = json.loads(batches[0].json)["sources"][0]
+        start_offset = source["startOffset"]
+        if start_offset is not None:
+            assert start_offset[topic]["0"] == expected_offset
+        else:
+            assert expected_offset == 0, "Expected the query to resume its checkpoint."
+        assert source["endOffset"][topic]["0"] == expected_offset + 1
         return {
             **inspect_table(spark),
             "query_id": str(query.id),
             "run_id": str(query.runId),
-            "input_rows": input_rows,
+            "input_rows": batches[0]["numInputRows"],
+            "input_kafka_offset": expected_offset,
         }
 
     receipt = datetime.fromisoformat(original["fetched_at_utc"])
@@ -93,8 +101,8 @@ def verify(spark: SparkSession, original: dict, run: Path) -> dict:
         "value": original["value"] + 2.0,
         "fetched_at_utc": (receipt + timedelta(minutes=2)).isoformat(),
     }
-    before = send_and_process(original)
-    after = send_and_process(correction)
+    before = send_and_process(original, 0)
+    after = send_and_process(correction, 1)
     for offset, event, step in ((0, original, before), (1, correction, after)):
         record = step["record"]
         for field in WEATHER_IDENTITY_COLUMNS:
@@ -117,12 +125,22 @@ def verify(spark: SparkSession, original: dict, run: Path) -> dict:
             offset,
         )
     assert before["snapshot_id"] != after["snapshot_id"]
-    assert before["query_id"] == after["query_id"]
-    assert before["run_id"] != after["run_id"]
+    identical_replay = send_and_process(correction, 2)
+    older_replay = send_and_process(original, 3)
+    for step in (identical_replay, older_replay):
+        assert step["record"] == after["record"], (
+            "Replay changed the accepted revision."
+        )
+
+    runs = (before, after, identical_replay, older_replay)
+    assert len({step["query_id"] for step in runs}) == 1
+    assert len({step["run_id"] for step in runs}) == len(runs)
     return {
         "source": "archived Open-Meteo record with a simulated correction",
         "before": before,
         "after": after,
+        "identical_replay": identical_replay,
+        "older_replay": older_replay,
     }
 
 
