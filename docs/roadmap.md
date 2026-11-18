@@ -141,6 +141,9 @@ complete hourly coverage. The [weather correction verification](weather-correcti
 shows a newer receipt replacing one canonical value for the same hour through
 Kafka and Spark. Identical and older replays reach Spark at new offsets and
 preserve the accepted row and its lineage.
+The [quarantine verification](data-quality-alerts.md#trace-a-weather-alert-to-kafka)
+follows a missing weather value from the alert through Iceberg to the exact
+Kafka record and checks the preserved payload.
 
 Remaining verification:
 

@@ -60,3 +60,30 @@ Both quarantine tables had zero rows in the previous 24 hours. With
 `--quarantine-hours 744`, the same read found six retained weather quarantine
 rows from the October validation check, in two error groups with Kafka lineage.
 The verification reports are under ignored `data/verification/data_quality_alerts_20261106/`.
+
+### Trace A Weather Alert To Kafka
+
+Start the [isolated broker](event-time-verification.md#run-locally) on port
+19092 and provide a canonical weather JSONL file whose first record contains a
+value. Use the [weather capture and export commands](../README.md#weather-source-check)
+to prepare the file. Stop the isolated broker after verification.
+
+```bash
+python scripts/verify_weather_quarantine.py "$canonical_weather_file"
+```
+
+The script sets the archived record's value to null and sends it to a new
+Kafka topic. The existing Spark sinks process the record into an isolated
+Iceberg warehouse. The script uses the alert product's quarantine summary and
+report builder, reads the quarantined row and fetches the Kafka record at the
+exact topic, partition and offset from the alert. The check compares the raw
+payload bytes, key and timestamp with the Iceberg row. The diagnostic consumer
+disables offset commits. The script prints the path to the JSON evidence under
+ignored `data/verification/`.
+
+On 2026-11-18 both weather queries reached Kafka's exclusive end offset 1.
+The canonical table had zero rows and the quarantine table had one row.
+The `recent_quarantine` alert reported `missing_value` and referenced
+`environment.verification.weather-quarantine-bz42ctvd`, partition 0, offset 0.
+Reading that record returned the original bytes, key `open_meteo:munich`, and
+timestamp `2026-11-18T12:52:29.240000Z`, all matching the Iceberg row.
