@@ -9,6 +9,9 @@ publishes hourly comparisons and data-quality alerts.
 
 ## Portfolio Walkthrough
 
+Use the [technical interview walkthrough](docs/interview-walkthrough.md) for three
+worked cases covering late data, corrections and data-quality diagnosis.
+
 1. Open the [result view](#environmental-result-view), select a UTC hour and
    compare the stations. Coverage counts and chart gaps show where the inputs
    are sparse.
@@ -176,6 +179,8 @@ checkpoints. The default is one cycle. Weather requests overlap the previous six
 hours by default, with `--weather-past-hours` available to change the overlap.
 OpenAQ polls the latest readings, so run multiple cycles over the period you want
 to observe.
+The [polling-gap check](docs/polling-gap-verification.md) verifies weather
+catch-up within the requested overlap and explains the OpenAQ history boundary.
 
 Run one collection session at a time. Wait for manual producer or Spark jobs in
 the same checkout to finish before starting the runner. Each step records its
