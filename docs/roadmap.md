@@ -144,13 +144,15 @@ preserve the accepted row and its lineage.
 The [quarantine verification](data-quality-alerts.md#trace-a-weather-alert-to-kafka)
 follows a missing weather value from the alert through Iceberg to the exact
 Kafka record and checks the preserved payload.
+The [polling-gap verification](polling-gap-verification.md) recovered six missing
+weather hours per location through the existing producer, Kafka and Spark.
 
 Remaining verification:
 
-1. Broaden verification of the real multi-location source-to-Kafka-to-Iceberg path,
-   including restart behavior and catch-up after a polling gap. Extend coverage
-   verification beyond the existing read-only identity/partition audit and
-   document operating commands in the README.
+1. Verify host reboot and the deployed Linux/AWS runtime. The local weather
+   catch-up check covers a simulated gap inside the six-hour overlap. The OpenAQ
+   latest-reading poll requires a separate historical retrieval mechanism to
+   recover observations missed between polls.
 
 Weather verification is complete when real values for the configured locations
 reach Iceberg, unchanged or replayed data creates no duplicate business keys,
