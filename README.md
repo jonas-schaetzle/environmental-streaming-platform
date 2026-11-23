@@ -25,7 +25,9 @@ worked cases covering late data, corrections and data-quality diagnosis.
    The [collection evidence](docs/collection-evidence.md) reconciles one run
    from Kafka to Iceberg and gives a reproducible window for the station comparison.
    The [AWS runbook](docs/aws-single-host.md) records the single-host deployment
-   plan and its remaining acceptance checks.
+   plan and its remaining acceptance checks. The
+   [local Linux probe](docs/linux-bootstrap-verification.md) records installed
+   bootstrap versions and the Spark/Iceberg compatibility result.
 
 ## Project Documentation
 

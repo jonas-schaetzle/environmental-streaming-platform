@@ -24,6 +24,11 @@ host size, credit mode, storage, metadata options and restricted SSH ingress.
 A mock plan cannot verify the target account's permissions, available capacity,
 AMI or first boot.
 
+The [local Linux bootstrap probe](linux-bootstrap-verification.md) exercises the
+unmodified installer on Ubuntu 24.04 AMD64 and records installed package versions,
+offline unit validation and a Spark/Iceberg compatibility check. Actual service
+activation, cloud-init and host reboot remain separate acceptance checks.
+
 ## Review Inputs And The Live Plan
 
 Keep the approved input values in an ignored `data/terraform/demo.tfvars` file.

@@ -173,6 +173,9 @@ Required completion outcomes:
 
 - [Single-host Terraform and bootstrap](aws-single-host.md) prepared and tested
   with a mock AWS provider; live plan and runtime verification remain
+- [Local Ubuntu AMD64 bootstrap probe](linux-bootstrap-verification.md) passed
+  real package installation, offline systemd unit checks and Spark/Iceberg
+  compatibility; active services and host lifecycle remain unverified
 - durable Kafka data, producer state, Iceberg warehouse, and separate checkpoints
   across process/container restart and reboot
 - bounded real API-to-Iceberg runs, restart/replay evidence, and repeatable deployment
