@@ -176,6 +176,9 @@ Required completion outcomes:
 - [Local Ubuntu AMD64 bootstrap probe](linux-bootstrap-verification.md) passed
   real package installation, offline systemd unit checks and Spark/Iceberg
   compatibility; active services and host lifecycle remain unverified
+- [Bounded Linux resource measurement](runtime-sizing.md) completed both live
+  source paths and all product reports with Kafka alive: 2.09 GiB cgroup peak
+  under a 6 GiB limit, with no OOM; on-host sizing confirmation remains
 - durable Kafka data, producer state, Iceberg warehouse, and separate checkpoints
   across process/container restart and reboot
 - bounded real API-to-Iceberg runs, restart/replay evidence, and repeatable deployment

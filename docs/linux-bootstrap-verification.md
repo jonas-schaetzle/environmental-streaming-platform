@@ -73,3 +73,6 @@ not establish RAM or storage sufficiency for the real pipeline.
 
 The production bootstrap, event schemas, producer state, Iceberg tables and
 streaming checkpoints are unchanged. No data migration or reset is needed.
+
+The [separate sizing mode](runtime-sizing.md) runs the real source-to-Iceberg
+jobs and product reports with Kafka alive under one memory limit.
