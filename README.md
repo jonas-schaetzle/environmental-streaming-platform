@@ -27,7 +27,9 @@ worked cases covering late data, corrections and data-quality diagnosis.
    The [AWS runbook](docs/aws-single-host.md) records the single-host deployment
    plan and its remaining acceptance checks. The
    [local Linux probe](docs/linux-bootstrap-verification.md) records installed
-   bootstrap versions and the Spark/Iceberg compatibility result.
+   bootstrap versions and the Spark/Iceberg compatibility result. The
+   [runtime-sizing check](docs/runtime-sizing.md) measures the bounded real pipeline
+   and product jobs against the single-host candidate.
 
 ## Project Documentation
 

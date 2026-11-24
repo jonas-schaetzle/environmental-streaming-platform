@@ -1,4 +1,7 @@
 import os
+import subprocess
+import sys
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -71,3 +74,42 @@ def test_configure_java_runtime_raises_clear_error_when_java_is_missing(
 
     with pytest.raises(RuntimeError, match="Spark 4.1 requires Java"):
         spark_runtime.configure_java_runtime()
+
+
+def test_python_workers_use_the_running_interpreter_without_path_activation(
+    tmp_path: Path,
+) -> None:
+    # A fresh process avoids reusing the session fixture's preselected worker.
+    wrong_python = tmp_path / "python3"
+    wrong_python.write_text("#!/bin/sh\nexit 97\n")
+    wrong_python.chmod(0o755)
+    environment = os.environ.copy()
+    environment.pop("PYSPARK_PYTHON", None)
+    environment.pop("PYSPARK_DRIVER_PYTHON", None)
+    environment["PATH"] = f"{tmp_path}{os.pathsep}{environment.get('PATH', '')}"
+    environment["SPARK_LOCAL_IP"] = "127.0.0.1"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            textwrap.dedent("""
+                import sys
+                from environmental_streaming.runtime.spark import create_spark_session
+
+                spark = create_spark_session("worker-interpreter-regression")
+                try:
+                    assert spark.sparkContext.pythonExec == sys.executable
+                    result = spark.createDataFrame([(42,)], ["value"]).collect()
+                    assert result[0].value == 42
+                    print("worker-result=42")
+                finally:
+                    spark.stop()
+            """),
+        ],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stderr[-6000:]
+    assert "worker-result=42" in result.stdout

@@ -28,6 +28,8 @@ The [local Linux bootstrap probe](linux-bootstrap-verification.md) exercises the
 unmodified installer on Ubuntu 24.04 AMD64 and records installed package versions,
 offline unit validation and a Spark/Iceberg compatibility check. Actual service
 activation, cloud-init and host reboot remain separate acceptance checks.
+The [bounded runtime-sizing check](runtime-sizing.md) measures Kafka plus
+sequential Spark processes and retained disk usage for the current workload.
 
 ## Review Inputs And The Live Plan
 
@@ -97,5 +99,5 @@ termination, export evidence and any data required for reproduction. Terminating
 the instance deletes its root volume. Confirm the project resources are gone and
 review delayed billing. See [EC2 lifecycle behavior](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html).
 
-The live plan, Linux runtime sizing, service restart and host reboot checks remain
-deployment acceptance steps.
+The live plan, on-host sizing confirmation, service restart and host reboot checks
+remain deployment acceptance steps.
