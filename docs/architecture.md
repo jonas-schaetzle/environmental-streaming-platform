@@ -56,6 +56,15 @@ clients, transport adapters, domain transformations, and storage operations stay
 separate so that a new source does not silently change the canonical contract or
 the behavior of an existing sink.
 
+### Local Python Workers
+
+The local Spark factory defaults `PYSPARK_PYTHON` to the running interpreter's
+absolute path. Calling `.venv/bin/python` directly therefore also selects that
+environment for Python workers, without requiring shell activation or a system
+`python3` alias. An explicitly supplied `PYSPARK_PYTHON` remains authoritative.
+This runtime selection changes no event schema, Iceberg identity or checkpoint;
+no migration or state reset is required.
+
 ## Event Contract
 
 The canonical Kafka payload contains the following fields:

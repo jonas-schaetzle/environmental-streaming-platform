@@ -2,6 +2,7 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from pyspark.sql import SparkSession
@@ -31,6 +32,7 @@ ICEBERG_WAREHOUSE_PATH = str(
 
 def create_spark_session(app_name: str = "measurement-kafka-stream") -> SparkSession:
     configure_java_runtime()
+    os.environ.setdefault("PYSPARK_PYTHON", sys.executable)
 
     return (
         SparkSession.builder.appName(app_name)
