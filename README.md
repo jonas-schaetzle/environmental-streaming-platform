@@ -29,7 +29,9 @@ worked cases covering late data, corrections and data-quality diagnosis.
    [local Linux probe](docs/linux-bootstrap-verification.md) records installed
    bootstrap versions and the Spark/Iceberg compatibility result. The
    [runtime-sizing check](docs/runtime-sizing.md) measures the bounded real pipeline
-   and product jobs against the single-host candidate.
+   and product jobs against the single-host candidate. The
+   [Linux restart check](docs/linux-restart-verification.md) verifies retained data
+   and checkpoints with no new input and with a pending weather replay.
 
 ## Project Documentation
 

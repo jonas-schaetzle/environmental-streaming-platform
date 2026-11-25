@@ -179,6 +179,9 @@ Required completion outcomes:
 - [Bounded Linux resource measurement](runtime-sizing.md) completed both live
   source paths and all product reports with Kafka alive: 2.09 GiB cgroup peak
   under a 6 GiB limit, with no OOM; on-host sizing confirmation remains
+- [Linux process restart verification](linux-restart-verification.md) preserved
+  all five query checkpoints and table contents, including one weather replay
+  retained across a broker restart; host reboot remains unverified
 - durable Kafka data, producer state, Iceberg warehouse, and separate checkpoints
   across process/container restart and reboot
 - bounded real API-to-Iceberg runs, restart/replay evidence, and repeatable deployment
