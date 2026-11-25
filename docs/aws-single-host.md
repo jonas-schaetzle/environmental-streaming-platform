@@ -30,6 +30,9 @@ offline unit validation and a Spark/Iceberg compatibility check. Actual service
 activation, cloud-init and host reboot remain separate acceptance checks.
 The [bounded runtime-sizing check](runtime-sizing.md) measures Kafka plus
 sequential Spark processes and retained disk usage for the current workload.
+The [Linux process-restart check](linux-restart-verification.md) verifies the
+retained real-data state and checkpoint continuation after broker restarts.
+EC2 service activation, permissions and host reboot remain separate checks.
 
 ## Review Inputs And The Live Plan
 

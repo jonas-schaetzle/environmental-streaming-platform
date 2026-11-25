@@ -25,3 +25,7 @@ COPY --from=apache/kafka:4.2.1@sha256:9916d60eca5d599550e2c320230808fda342124ba5
 COPY config/ config/
 COPY runtime_sizing.py /opt/probe/
 CMD [".venv/bin/python", "/opt/probe/runtime_sizing.py"]
+
+FROM runtime-sizing AS runtime-restart
+COPY runtime_restart.py /opt/probe/
+CMD [".venv/bin/python", "/opt/probe/runtime_restart.py"]

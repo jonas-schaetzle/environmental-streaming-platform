@@ -164,8 +164,11 @@ report ages use actual instants independently of the host timezone. See the
 compatibility and regeneration of earlier reports. No stored event time or source
 contract was changed by either package.
 
-Still unverified: host reboot, fresh Linux deployment/permissions, disk-loss recovery,
-extended polling-gap catch-up, and the broader weather correction/replay cases in
-the roadmap. Existing tests cover model/revision rules, but this run does not
-replace their broader real-path acceptance evidence. No checkpoint, producer state,
-topic or lake data was reset; the old Kafka data copies remain under data/.
+The November 3 run did not verify host reboot, fresh Linux deployment/permissions,
+disk-loss recovery, extended polling-gap catch-up or weather correction/replay.
+Later dedicated checks cover [weather revisions](weather-correction-verification.md),
+[bounded weather catch-up](polling-gap-verification.md) and
+[Linux process restarts](linux-restart-verification.md). Host reboot, EC2
+permissions and disk-loss recovery remain separate acceptance concerns. No
+checkpoint, producer state, topic or lake data was reset by the November 3 check;
+the old Kafka data copies remain under data/.
